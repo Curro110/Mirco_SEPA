@@ -24,7 +24,12 @@
 #define LED4_ON  GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_0, GPIO_PIN_0)
 #define LED4_OFF GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_0, 0)
 
-
+#define ESP1_ON  GPIOPinWrite(GPIO_PORTK_BASE, GPIO_PIN_7, 1)// aqui estan los defines para que sea mas faciles para poner que se encienda los pines que comunican con la esp
+#define ESP1_OFF GPIOPinWrite(GPIO_PORTK_BASE, GPIO_PIN_7, 0)
+#define ESP2_ON  GPIOPinWrite(GPIO_PORTK_BASE, GPIO_PIN_6, 1)
+#define ESP2_OFF GPIOPinWrite(GPIO_PORTK_BASE, GPIO_PIN_6, 0)
+#define ESP3_ON  GPIOPinWrite(GPIO_PORTH_BASE, GPIO_PIN_1, 1)
+#define ESP3_OFF GPIOPinWrite(GPIO_PORTK_BASE, GPIO_PIN_1, 0)
 
 #define XpMax 300
 #define XpMin 210
@@ -65,7 +70,7 @@ enum estados {
  Verificacion_hora,//Verificar si la hora es correcta
  Verificacion_min,//Verificar si el minuto es correcto
 
- Reposo1,//El usuario ha tomado la pastilla de la mañana?
+ Reposo1,//El usuario ha tomado la pastilla de la maÃ±ana?
  Reposo2,//El usuario ha tomado la pastilla de la tarde?
  Reposo3,//El usuario ha tomado la pastilla de la noche?
 
@@ -182,7 +187,7 @@ int main(void) {
     SysCtlPeripheralEnable(SYSCTL_PERIPH_GPION);
     GPIOPinTypeGPIOOutput(GPIO_PORTN_BASE, GPIO_PIN_0 |GPIO_PIN_1);
 
-    //Habilitar los periféricos implicados: GPIOF, J, N
+    //Habilitar los perifÃ©ricos implicados: GPIOF, J, N
     SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
     SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOG);
     SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOJ);
@@ -201,7 +206,7 @@ int main(void) {
     GPIOPinTypePWM(GPIO_PORTF_BASE, GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3 );
     GPIOPinTypePWM(GPIO_PORTG_BASE, GPIO_PIN_0);
 
-    //Configurar el pwm0, contador descendente y sin sincronización (actualización automática)
+    //Configurar el pwm0, contador descendente y sin sincronizaciÃ³n (actualizaciÃ³n automÃ¡tica)
     PWMGenConfigure(PWM0_BASE, PWM_GEN_0, PWM_GEN_MODE_DOWN | PWM_GEN_MODE_NO_SYNC);
     PWMGenConfigure(PWM0_BASE, PWM_GEN_1, PWM_GEN_MODE_DOWN | PWM_GEN_MODE_NO_SYNC);
     PWMGenConfigure(PWM0_BASE, PWM_GEN_2, PWM_GEN_MODE_DOWN | PWM_GEN_MODE_NO_SYNC);
@@ -228,6 +233,8 @@ int main(void) {
     GPIOPinTypeGPIOInput(GPIO_PORTJ_BASE, GPIO_PIN_0|GPIO_PIN_1); //J0 y J1: entradas
     GPIOPadConfigSet(GPIO_PORTJ_BASE,GPIO_PIN_0|GPIO_PIN_1,GPIO_STRENGTH_2MA,GPIO_PIN_TYPE_STD_WPU);
 
+    GPIOPinTypeGPIOOutput(GPIO_PORTK_BASE, GPIO_PIN_7 |GPIO_PIN_6); //K6 y K7: salidas en la placa son los pines de abajo de la derecha los interirores el primero y segundo por abajo
+    GPIOPinTypeGPIOOutput(GPIO_PORTH_BASE, GPIO_PIN_1 ); // justo el de arriba a estos dos
     // Timer T0
     SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);       //Habilita T0
     TimerClockSourceSet(TIMER0_BASE, TIMER_CLOCK_SYSTEM);   //T0 a 120MHz
@@ -248,7 +255,8 @@ int main(void) {
 
     UARTStdioConfig(0, 115200, RELOJ);
 
-
+    SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_GPIOK);
+    SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_GPIOH);// estas dos lineas de codigo habilita las salidas a la esp
     SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_GPIOJ);
     SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_TIMER0);       //Habilita T0
     SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_GPIOF);
@@ -284,7 +292,7 @@ int main(void) {
 
     //BOTONES
     set_color_blanco();
-   ComRect (20,140,96,220,true); //boton mañana
+   ComRect (20,140,96,220,true); //boton maÃ±ana
     set_color_negro();
    ComTXT(53,180,26,OPT_CENTER,"M");
 
@@ -372,14 +380,14 @@ int main(void) {
         case Verificacion_dia:
             idx = validar_dia(dia);
             if (idx >= 0)
-            { // día correcto
+            { // dÃ­a correcto
 
                 UARTprintf("Dia valido: %s\n", semana[idx]);
                 UARTprintf("\n Introuzca la hora del dia (00-23):\n");
                 estado_actual = Hora1;
             }
             else
-            {// día no válido
+            {// dÃ­a no vÃ¡lido
 
                 UARTprintf("Error: dia no valido (se recibio '%c%c%c')\n", dia[0], dia[1], dia[2]);
                 UARTprintf("Introducir de nuevo\n");
@@ -399,7 +407,7 @@ int main(void) {
                     estado_actual = Hora2;
                 }
                 else {
-                    UARTprintf("\nError: solo se permiten números.\n");
+                    UARTprintf("\nError: solo se permiten nÃºmeros.\n");
                     UARTprintf("\nIntroducir de nuevo:\n");
                     estado_actual = Hora1;
                 }
@@ -410,14 +418,14 @@ int main(void) {
             if (UARTCharsAvail(UART0_BASE)) {
                 c = UARTCharGetNonBlocking(UART0_BASE);
 
-                // Verificar si es un dígito
+                // Verificar si es un dÃ­gito
                 if (c >= '0' && c <= '9') {
                     hora[1] = c;
                     hora[2] = '\0';
                     UARTCharPutNonBlocking(UART0_BASE, c);
                     estado_actual = Verificacion_hora;
                 } else {
-                    UARTprintf("\nError: solo se permiten números.\n");
+                    UARTprintf("\nError: solo se permiten nÃºmeros.\n");
                     UARTprintf("\nIntroducir de nuevo:\n");
                     estado_actual = Hora1;
                 }
@@ -455,7 +463,7 @@ int main(void) {
                     estado_actual = Min2;
                 }
                 else {
-                    UARTprintf("\nError: solo se permiten números.\n");
+                    UARTprintf("\nError: solo se permiten nÃºmeros.\n");
                     UARTprintf("\nIntroducir de nuevo:\n");
                     estado_actual = Min1;
                 }
@@ -466,14 +474,14 @@ int main(void) {
             if (UARTCharsAvail(UART0_BASE)) {
                 c = UARTCharGetNonBlocking(UART0_BASE);
 
-                // Verificar si es un dígito
+                // Verificar si es un dÃ­gito
                 if (c >= '0' && c <= '9') {
                     minuto[1] = c;
                     minuto[2] = '\0';
                     UARTCharPutNonBlocking(UART0_BASE, c);
                     estado_actual = Verificacion_min;
                 } else {
-                    UARTprintf("\nError: solo se permiten números.\n");
+                    UARTprintf("\nError: solo se permiten nÃºmeros.\n");
                     UARTprintf("\nIntroducir de nuevo:\n");
                     estado_actual = Min1;
                 }
@@ -551,13 +559,13 @@ int main(void) {
             ComTXT(90, 80, 26, OPT_CENTER, "HORA");
             ComTXT(210, 80, 26, OPT_CENTER, "MINUTO");
 
-            // ----- Triángulos arriba -----
+            // ----- TriÃ¡ngulos arriba -----
             ComColor(0,0,0);
             ComFgcolor(0,0, 255);
-            ComButton(75, 100, 30, 35, 22,OPT_FLAT, "^");   // ▲ hora
-            ComButton(195, 100, 30, 35, 22,OPT_FLAT, "^"); // ▲ minuto
+            ComButton(75, 100, 30, 35, 22,OPT_FLAT, "^");   // â–² hora
+            ComButton(195, 100, 30, 35, 22,OPT_FLAT, "^"); // â–² minuto
 
-            // ----- Números -----
+            // ----- NÃºmeros -----
             set_color_blanco();
             ComRect(80,140, 100, 160, true);
             ComRect(200,140, 220, 160, true);
@@ -567,13 +575,13 @@ int main(void) {
             sprintf(buffer, "%02d", minutos_manana);
             ComTXT(210, 150, 28, OPT_CENTER, buffer);
 
-            // ----- Triángulos abajo -----
+            // ----- TriÃ¡ngulos abajo -----
             ComColor(0,0,0);
             ComFgcolor(0,0, 255);
-            ComButton(75, 170, 30, 35, 22,OPT_FLAT, "v");   // ▼ hora
-            ComButton(195, 170, 30, 35, 22,OPT_FLAT, "v"); // ▼ minuto
+            ComButton(75, 170, 30, 35, 22,OPT_FLAT, "v");   // â–¼ hora
+            ComButton(195, 170, 30, 35, 22,OPT_FLAT, "v"); // â–¼ minuto
 
-            // ----- Botón OK -----
+            // ----- BotÃ³n OK -----
             ComColor(0,0,0);
             ComFgcolor(0,255, 0);
             ComButton(280, 200, 30, 30, 22,OPT_CENTER, "OK");
@@ -656,7 +664,7 @@ int main(void) {
             //BOTONES
             ComColor(0,0,0);
             ComFgcolor(0,255, 0);
-            ComButton(20, 140, 80, 80, 22,OPT_FLAT, "M");//boton mañana
+            ComButton(20, 140, 80, 80, 22,OPT_FLAT, "M");//boton maÃ±ana
             ComFgcolor(255,255, 255);
             ComButton(116, 140, 80, 80, 22,OPT_FLAT, "T");//boton tarde
             ComButton(212, 140, 80, 80, 22,OPT_FLAT, "N");//boton noche
@@ -718,13 +726,13 @@ int main(void) {
                         ComTXT(90, 80, 26, OPT_CENTER, "HORA");
                         ComTXT(210, 80, 26, OPT_CENTER, "MINUTO");
 
-                        // ----- Triángulos arriba -----
+                        // ----- TriÃ¡ngulos arriba -----
                         ComColor(0,0,0);
                         ComFgcolor(0,0, 255);
-                        ComButton(75, 100, 30, 35, 22,OPT_FLAT, "^");   // ▲ hora
-                        ComButton(195, 100, 30, 35, 22,OPT_FLAT, "^"); // ▲ minuto
+                        ComButton(75, 100, 30, 35, 22,OPT_FLAT, "^");   // â–² hora
+                        ComButton(195, 100, 30, 35, 22,OPT_FLAT, "^"); // â–² minuto
 
-                        // ----- Números -----
+                        // ----- NÃºmeros -----
                         set_color_blanco();
                         ComRect(80,140, 100, 160, true);
                         ComRect(200,140, 220, 160, true);
@@ -734,13 +742,13 @@ int main(void) {
                         sprintf(buffer, "%02d", minutos_manana);
                         ComTXT(210, 150, 28, OPT_CENTER, buffer);
 
-                        // ----- Triángulos abajo -----
+                        // ----- TriÃ¡ngulos abajo -----
                         ComColor(0,0,0);
                         ComFgcolor(0,0, 255);
-                        ComButton(75, 170, 30, 35, 22,OPT_FLAT, "v");   // ▼ hora
-                        ComButton(195, 170, 30, 35, 22,OPT_FLAT, "v"); // ▼ minuto
+                        ComButton(75, 170, 30, 35, 22,OPT_FLAT, "v");   // â–¼ hora
+                        ComButton(195, 170, 30, 35, 22,OPT_FLAT, "v"); // â–¼ minuto
 
-                        // ----- Botón OK -----
+                        // ----- BotÃ³n OK -----
                         ComColor(0,0,0);
                         ComFgcolor(0,255, 0);
                         ComButton(280, 200, 30, 30, 22,OPT_CENTER, "OK");
@@ -824,7 +832,7 @@ int main(void) {
             //BOTONES
             ComColor(0,0,0);
             ComFgcolor(0,255, 0);
-            ComButton(20, 140, 80, 80, 22,OPT_FLAT, "M");//boton mañana
+            ComButton(20, 140, 80, 80, 22,OPT_FLAT, "M");//boton maÃ±ana
             ComButton(116, 140, 80, 80, 22,OPT_FLAT, "T");//boton tarde
             ComFgcolor(255,255, 255);
             ComButton(212, 140, 80, 80, 22,OPT_FLAT, "N");//boton noche
@@ -886,13 +894,13 @@ int main(void) {
             ComTXT(90, 80, 26, OPT_CENTER, "HORA");
             ComTXT(210, 80, 26, OPT_CENTER, "MINUTO");
 
-            // ----- Triángulos arriba -----
+            // ----- TriÃ¡ngulos arriba -----
             ComColor(0,0,0);
             ComFgcolor(0,0, 255);
-            ComButton(75, 100, 30, 35, 22,OPT_FLAT, "^");   // ▲ hora
-            ComButton(195, 100, 30, 35, 22,OPT_FLAT, "^"); // ▲ minuto
+            ComButton(75, 100, 30, 35, 22,OPT_FLAT, "^");   // â–² hora
+            ComButton(195, 100, 30, 35, 22,OPT_FLAT, "^"); // â–² minuto
 
-            // ----- Números -----
+            // ----- NÃºmeros -----
             set_color_blanco();
             ComRect(80,140, 100, 160, true);
             ComRect(200,140, 220, 160, true);
@@ -902,13 +910,13 @@ int main(void) {
             sprintf(buffer, "%02d", minutos_manana);
             ComTXT(210, 150, 28, OPT_CENTER, buffer);
 
-            // ----- Triángulos abajo -----
+            // ----- TriÃ¡ngulos abajo -----
             ComColor(0,0,0);
             ComFgcolor(0,0, 255);
-            ComButton(75, 170, 30, 35, 22,OPT_FLAT, "v");   // ▼ hora
-            ComButton(195, 170, 30, 35, 22,OPT_FLAT, "v"); // ▼ minuto
+            ComButton(75, 170, 30, 35, 22,OPT_FLAT, "v");   // â–¼ hora
+            ComButton(195, 170, 30, 35, 22,OPT_FLAT, "v"); // â–¼ minuto
 
-            // ----- Botón OK -----
+            // ----- BotÃ³n OK -----
             ComColor(0,0,0);
             ComFgcolor(0,255, 0);
             ComButton(280, 200, 30, 30, 22,OPT_CENTER, "OK");
@@ -991,7 +999,7 @@ int main(void) {
             //BOTONES
             ComColor(0,0,0);
             ComFgcolor(0,255, 0);
-            ComButton(20, 140, 80, 80, 22,OPT_FLAT, "M");//boton mañana
+            ComButton(20, 140, 80, 80, 22,OPT_FLAT, "M");//boton maÃ±ana
             ComButton(116, 140, 80, 80, 22,OPT_FLAT, "T");//boton tarde
             ComButton(212, 140, 80, 80, 22,OPT_FLAT, "N");//boton noche
 
@@ -1031,7 +1039,7 @@ int main(void) {
 
                     if(Boton(20, 140, 80, 80,28, "M")) //Si aprieto boton Pieza A
                                 {
-                                    estado_actual=Mañana;
+                                    estado_actual=MaÃ±ana;
 
                                 }
 
@@ -1060,16 +1068,16 @@ int main(void) {
             PWMPulseWidthSet(PWM0_BASE, PWM_OUT_4, posicion); // Mueve un poco el servo
             SysCtlDelay(SysCtlClockGet() / 3); // espera 1 seg
 
-            // Decide siguiente estado según hora
+            // Decide siguiente estado segÃºn hora
             if (horas >= 4 && horas < 12)
-                estado_actual = Mañana;
+                estado_actual = MaÃ±ana;
             else if (horas >= 12 && horas < 18)
                 estado_actual = Tarde;
             else
                 estado_actual = Noche;
             break;
 
-        case Mañana:
+        case MaÃ±ana:
             if (Tarde) set_color_verde();
             else set_color_blanco();
             ComRect(20,140,96,220,true);
@@ -1081,10 +1089,10 @@ int main(void) {
             break;
         case Tarde:
             if (horas >= 18 || horas < 4) estado_actual = Noche;
-            if (horas >= 4 && horas < 12) estado_actual = Mañana;
+            if (horas >= 4 && horas < 12) estado_actual = MaÃ±ana;
             break;
         case Noche:
-            if (horas >= 4 && horas < 12) estado_actual = Mañana;
+            if (horas >= 4 && horas < 12) estado_actual = MaÃ±ana;
             if (horas >= 12 && horas < 18) estado_actual = Tarde;
             break;
         case AvisoM:
@@ -1130,7 +1138,6 @@ void IntTimer0(void)
         }
     }
 }
-
 
 
 
