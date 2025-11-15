@@ -75,33 +75,38 @@ enum estados {
  Verificacion_hora,//Verificar si la hora es correcta
  Verificacion_min,//Verificar si el minuto es correcto
 
- Reposo1,//El usuario ha tomado la pastilla de la maÃ±ana?
+ Reposo1,//El usuario ha tomado la pastilla de la manana?
  Reposo2,//El usuario ha tomado la pastilla de la tarde?
  Reposo3,//El usuario ha tomado la pastilla de la noche?
 
 MananaOK,// Se ha tomado la primera pastilla del dia
 MananaNO,// No se ha tomado la primera pastilla del dia
-MananaInicio,//Pantalla de inicio para el caso de si se ha tomado o no la primera pastilla
+
 
 TardeOK,// Se ha tomado la segunda pastilla del dia
 TardeNO,// No se ha tomado la segunda pastilla del dia
-TardeInicio,//Pantalla de inicio para el caso de si se ha tomado o no la segunda pastilla
+
 
 NocheOK,// Se ha tomado la tercera pastilla del dia
 NocheNO,// No se ha tomado la tercera pastilla del dia
-NocheInicio,//Pantalla de inicio para el caso de si se ha tomado o no la tercera pastilla
+
+Inicio_i,//Pantalla de inicio
 
 Manana,//Pantalla para abrir manualmente el pastillero o poner alarma de la mañana
 ConfigHora1,//Pantalla para configurar la alarma de mañana
-AbrirManana,
+AbrirManana, //Abrir pastillero de manera manual en caso de que no se haya tomado la pastilla
 
 Tarde,//Pantalla para abrir manualmente el pastillero o poner alarma de la tarde
 ConfigHora2,//Pantalla para configurar la alarma de tarde
-AbrirTarde,
+AbrirTarde,//Abrir pastillero de manera manual en caso de que no se haya tomado la pastilla
 
 Noche,//Pantalla para abrir manualmente el pastillero o poner alarma de la noche
 ConfigHora3,//Pantalla para configurar la alarma de noche
-AbrirNoche
+AbrirNoche,//Abrir pastillero de manera manual en caso de que no se haya tomado la pastilla
+
+AlarmaManana,//Alarma de la manana suena
+AlarmaTarde,//Alarma de la tarde suena
+AlarmaNoche//Alarma de la noche suena
 };
 
 enum estados estado_actual, estado_anterior;
@@ -126,11 +131,12 @@ int horas_tarde=0, minutos_tarde=0;//variables para modificar la hora en la que 
 int minutos_tarde_ant=0, minutos_manana_ant=0, minutos_noche_ant=0;
 int horas_noche=0, minutos_noche=0;//variables para modificar la hora en la que se ha tomado la tercera pastilla
 int alarma_manana=7, alarma_tarde=15, alarma_noche=23;//Alarmas predeterminadas cada 8h--> a modificar por el usuario segun la pastilla que necesite
-char texto_hora[10];//variable para escribir la alarma predeterminada
+char texto_hora_manana[10], texto_hora_tarde[10], texto_hora_noche[10];//variable para escribir la alarma predeterminada
 char buffer2[9]; //Variable que imprime la hora en la pantalla
 int p; //Contador para contar segundos
 int espera; //contador para esperar que el usuario coja la pastilla
-int tiempo_inicio;
+int tiempo_inicio; //variable para controlar cuanto tiempo se mantiene el pastillero abierto
+int tiempo_mensaje;//variable para marcar cuando se envia un mensaje por whatsapp al familiar
 
 int no_manana=0, no_tarde=0, no_noche=0; // variable que se pone a 1 si no se ha tomado la pastilla del dia
 
@@ -147,6 +153,8 @@ volatile int posicion;
 volatile int Max_pos = 4200; //3750
 volatile int Min_pos = 1300; //1875
 volatile int pos_100, pos_1000;
+int parp=0;//parpadeo
+int Periodo_parp;
 
 uint32_t temporizador=0;
 int m = 0;
@@ -199,6 +207,7 @@ void SysCtlSleepFake(void)
 
 //Temporizador
 void IntTimer0(void);
+void IntTimer1(void);
 
 int main(void) {
 
@@ -240,6 +249,7 @@ int main(void) {
 
     PeriodoPWM=37499; // 50Hz  a 1.875MHz
     posicion=Min_pos;
+    Periodo_parp=14999999; // 4 Hz
     PWMGenPeriodSet(PWM0_BASE, PWM_GEN_0, PeriodoPWM);
     PWMGenPeriodSet(PWM0_BASE, PWM_GEN_1, PeriodoPWM);
     PWMGenPeriodSet(PWM0_BASE, PWM_GEN_2, PeriodoPWM);
@@ -273,6 +283,17 @@ int main(void) {
     IntMasterEnable();  //Habilitacion global de interrupciones
     TimerEnable(TIMER0_BASE, TIMER_A);  //Habilitar Timer0
 
+    // Timer 1
+       SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER1); // Habilita T1
+       TimerClockSourceSet(TIMER1_BASE, TIMER_CLOCK_SYSTEM);       // T1 a 120MHz
+       TimerConfigure(TIMER1_BASE, TIMER_CFG_PERIODIC);   //T1 periodico y conjunto (32b)
+       TimerLoadSet(TIMER1_BASE, TIMER_A, Periodo_parp); //125 ms
+       TimerIntRegister(TIMER1_BASE, TIMER_A, IntTimer1);
+       IntEnable(INT_TIMER1A);    //Habilitar las interrupciones globales de los timers
+       TimerIntEnable(TIMER1_BASE, TIMER_TIMA_TIMEOUT);    // Habilitar las interrupciones de timeout
+       IntMasterEnable();//Habilitacion global de interrupciones
+       TimerEnable(TIMER1_BASE, TIMER_A);      //Habilitar Timer1
+
     //Habilitar UART
     SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);
     SysCtlPeripheralEnable(SYSCTL_PERIPH_UART0);
@@ -286,6 +307,7 @@ int main(void) {
     SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_GPIOH);// estas dos lineas de codigo habilita las salidas a la esp
     SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_GPIOJ);
     SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_TIMER0);       //Habilita T0
+    SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_TIMER1);       //Habilita T1
     SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_GPIOF);
     SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_GPION);
     SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_PWM0);
@@ -342,7 +364,7 @@ int main(void) {
                 c = UARTCharGetNonBlocking(UART0_BASE);
                 dia[0] = c;
                 UARTCharPutNonBlocking(UART0_BASE, c);
-                estado_actual = Dia2;  // siguiente estado
+                estado_actual = Dia2;
             }
 
             break;
@@ -353,7 +375,7 @@ int main(void) {
                 c = UARTCharGetNonBlocking(UART0_BASE);
                 dia[1] = c;
                 UARTCharPutNonBlocking(UART0_BASE, c);
-                estado_actual = Dia3;  // siguiente estado
+                estado_actual = Dia3;
             }
 
             break;
@@ -366,7 +388,7 @@ int main(void) {
                 dia[3] = '\0'; // fin de cadena
                 UARTCharPutNonBlocking(UART0_BASE, c);
                 UARTCharPut(UART0_BASE, '\n');
-                estado_actual = Verificacion_dia;  // siguiente estado
+                estado_actual = Verificacion_dia;
 
             }
 
@@ -375,14 +397,14 @@ int main(void) {
         case Verificacion_dia:
             idx = validar_dia(dia);
             if (idx >= 0)
-            { // dÃ­a correcto
+            { // dia correcto
 
                 UARTprintf("Dia valido: %s\n", semana[idx]);
                 UARTprintf("\n Introuzca la hora del dia (1-24):\n");
                 estado_actual = Hora1;
             }
             else
-            {// dÃ­a no vÃ¡lido
+            {// dia no valido
 
                 UARTprintf("Error: dia no valido (se recibio '%c%c%c')\n", dia[0], dia[1], dia[2]);
                 UARTprintf("Introducir de nuevo\n");
@@ -413,7 +435,7 @@ int main(void) {
             if (UARTCharsAvail(UART0_BASE)) {
                 c = UARTCharGetNonBlocking(UART0_BASE);
 
-                // Verificar si es un dÃ­gito
+                // Verificar si es un digito
                 if (c >= '0' && c <= '9') {
                     hora[1] = c;
                     hora[2] = '\0';
@@ -469,7 +491,7 @@ int main(void) {
             if (UARTCharsAvail(UART0_BASE)) {
                 c = UARTCharGetNonBlocking(UART0_BASE);
 
-                // Verificar si es un dÃ­gito
+                // Verificar si es un digito
                 if (c >= '0' && c <= '9') {
                     minuto[1] = c;
                     minuto[2] = '\0';
@@ -533,7 +555,7 @@ int main(void) {
 
             if(Boton(170, 160, 40, 40, 22, "NO")) //Si aprieto boton NO
             {
-                estado_actual=MananaInicio;
+                estado_actual=Inicio_i;
                 segundos=0;
                 r_manana=1;
                 g_manana=0;
@@ -617,7 +639,7 @@ int main(void) {
             }
             if(Boton(280, 200, 30, 30, 22, "OK"))
             {
-                estado_actual=MananaInicio;
+                estado_actual=Inicio_i;
                 segundos=0;
                 r_manana=0;
                 g_manana=1;
@@ -629,53 +651,6 @@ int main(void) {
             }
             break;
 
-        case MananaInicio:
-
-            sprintf(buffer, "%02d:%02d:%02d", horas, minutos, segundos);
-
-            Nueva_pantalla(0x10,0x10,0x10);
-
-            //FONDO
-            set_color_azul();
-            ComRect(0,0, HSIZE, VSIZE, true);
-
-
-            //DIA DE LA SEMANA
-            sprintf(buffer2, "%02d:%02d:%02d", horas, minutos, segundos);
-            set_color_blanco();             // borrar fondo de la hora
-            ComRect(53,30,265,90,true);
-            set_color_negro();              // color del texto hora
-            ComTXT((53+265)/2, (30+90)/2, 28, OPT_CENTER, buffer); // dibuja la hora centrada
-
-            //BOTONES
-            ComColor(0,0,0);
-            ComFgcolor(255*r_manana,255*g_manana,255*b_manana);
-            ComButton(20, 140, 80, 80, 22,OPT_FLAT, "M");//boton maÃ±ana
-            ComFgcolor(255*r_tarde,255*g_tarde,255*b_tarde);
-            ComButton(116, 140, 80, 80, 22,OPT_FLAT, "T");//boton tarde
-            ComFgcolor(255*r_noche,255*g_noche,255*b_noche);
-            ComButton(212, 140, 80, 80, 22,OPT_FLAT, "N");//boton noche
-
-            Dibuja();
-
-            if(Boton(20, 140, 80, 80,28, "M")) //Si aprieto boton Pieza A
-            {
-                estado_actual=Manana;
-
-            }
-
-            if(Boton(116, 140, 80, 80,28, "T")) //Si aprieto boton Pieza A
-            {
-                estado_actual=Tarde;
-
-            }
-
-            if(Boton(212, 140, 80, 80,28, "N")) //Si aprieto boton Pieza A
-            {
-                estado_actual=Noche;
-
-            }
-            break;
 
 
             //--------------------------------------Usuario ha tomado segunda pastilla?-----------------------------------------------//
@@ -707,7 +682,7 @@ int main(void) {
 
             if(Boton(170, 160, 40, 40, 22, "NO")) //Si aprieto boton NO
             {
-                estado_actual=TardeInicio;
+                estado_actual=Inicio_i;
                 segundos=0;
                 r_tarde=1;
                 g_tarde=0;
@@ -791,7 +766,7 @@ int main(void) {
             }
             if(Boton(280, 200, 30, 30, 22, "OK"))
             {
-                estado_actual=TardeInicio;
+                estado_actual=Inicio_i;
                 r_tarde=0;
                 g_tarde=1;
                 b_tarde=0;
@@ -801,53 +776,7 @@ int main(void) {
             }
             break;
 
-        case TardeInicio:
 
-            sprintf(buffer, "%02d:%02d:%02d", horas, minutos, segundos);
-
-            Nueva_pantalla(0x10,0x10,0x10);
-
-            //FONDO
-            set_color_azul();
-            ComRect(0,0, HSIZE, VSIZE, true);
-
-
-            //DIA DE LA SEMANA
-            sprintf(buffer2, "%02d:%02d:%02d", horas, minutos, segundos);
-            set_color_blanco();             // borrar fondo de la hora
-            ComRect(53,30,265,90,true);
-            set_color_negro();              // color del texto hora
-            ComTXT((53+265)/2, (30+90)/2, 28, OPT_CENTER, buffer); // dibuja la hora centrada
-
-            //BOTONES
-            ComColor(0,0,0);
-            ComFgcolor(255*r_manana,255*g_manana,255*b_manana);
-            ComButton(20, 140, 80, 80, 22,OPT_FLAT, "M");//boton maÃ±ana
-            ComFgcolor(255*r_tarde,255*g_tarde,255*b_tarde);
-            ComButton(116, 140, 80, 80, 22,OPT_FLAT, "T");//boton tarde
-            ComFgcolor(255*r_noche,255*g_noche,255*b_noche);
-            ComButton(212, 140, 80, 80, 22,OPT_FLAT, "N");//boton noche
-
-            Dibuja();
-
-            if(Boton(20, 140, 80, 80,28, "M")) //Si aprieto boton Pieza A
-            {
-                estado_actual=Manana;
-
-            }
-
-            if(Boton(116, 140, 80, 80,28, "T")) //Si aprieto boton Pieza A
-            {
-                estado_actual=Tarde;
-
-            }
-
-            if(Boton(212, 140, 80, 80,28, "N")) //Si aprieto boton Pieza A
-            {
-                estado_actual=Noche;
-
-            }
-            break;
 
             //--------------------------------------Usuario ha tomado tercera pastilla?-----------------------------------------------//
 
@@ -878,12 +807,13 @@ int main(void) {
 
             if(Boton(210, 160, 40, 40, 22, "NO")) //Si aprieto boton NO
             {
-                estado_actual=NocheInicio;
+                estado_actual=Inicio_i;
                 segundos=0;
                 r_noche=1;
                 g_noche=0;
                 b_noche=0;
                 no_noche=1;
+                tiempo_mensaje=0;//comienza tiempo antes de enviar mensaje
             }
 
             break;
@@ -961,14 +891,16 @@ int main(void) {
             }
             if(Boton(280, 200, 30, 30, 22, "OK"))
             {
-                estado_actual=NocheInicio;
+                estado_actual=Inicio_i;
                 r_noche=0;
                 g_noche=1;
                 b_noche=0;
             }
             break;
 
-        case NocheInicio:
+            //--------------------------------------INICIO-----------------------------------------------//
+
+        case Inicio_i:
 
             sprintf(buffer, "%02d:%02d:%02d", horas, minutos, segundos);
 
@@ -996,34 +928,49 @@ int main(void) {
             ComButton(212, 140, 80, 80, 22,OPT_FLAT, "N");//boton noche
 
             Dibuja();
+            estado_anterior=estado_actual;
 
-            if(Boton(20, 140, 80, 80,28, "M")) //Si aprieto boton Pieza A
+            if((no_manana==1 || no_tarde==1 || no_noche==1) && segundos>30)//Se envia mensaje por whatsapp a adulto
+
+                if(Boton(20, 140, 80, 80,28, "M")) //Si aprieto boton Pieza A
+                {
+                    estado_actual=Manana;
+
+                }
+                if(Boton(116, 140, 80, 80,28, "T")) //Si aprieto boton Pieza A
+                {
+                    estado_actual=Tarde;
+
+                }
+                if(Boton(212, 140, 80, 80,28, "N")) //Si aprieto boton Pieza A
+                {
+                    estado_actual=Noche;
+
+                }
+
+            if(horas==alarma_manana && minutos==minutos_manana_ant)//Si se cumple el tiempo de la alarma de la manana
             {
-                estado_actual=Manana;
-
+                estado_actual=AlarmaManana;
+            }
+            if(horas==alarma_tarde && minutos==minutos_tarde_ant)//Si se cumple el tiempo de la alarma de la tarde
+            {
+                estado_actual=AlarmaTarde;
+            }
+            if(horas==alarma_noche && minutos==minutos_noche_ant)//Si se cumple el tiempo de la alarma de la noche
+            {
+                estado_actual=AlarmaNoche;
             }
 
-            if(Boton(116, 140, 80, 80,28, "T")) //Si aprieto boton Pieza A
-            {
-                estado_actual=Tarde;
-
-            }
-
-            if(Boton(212, 140, 80, 80,28, "N")) //Si aprieto boton Pieza A
-            {
-                estado_actual=Noche;
-
-            }
             break;
 
 
-            //--------------------------------------Usuario interactua con la interfaz-----------------------------------------------//
+            //--------------------------------------Usuario quiere poner alarma de mañana-----------------------------------------------//
 
         case Manana:
 
             horas_manana=alarma_manana;
             minutos_manana=minutos_manana_ant;
-            sprintf(texto_hora, "%02d:%02d", alarma_manana,minutos_manana);   // convierte 12 → "12"
+            sprintf(texto_hora_manana, "%02d:%02d", alarma_manana,minutos_manana);   // convierte 12 → "12"
 
             Nueva_pantalla(0x10,0x10,0x10);
 
@@ -1031,7 +978,7 @@ int main(void) {
             set_color_azul();
             ComRect(0,0, HSIZE, VSIZE, true);
             ComFgcolor(255,255, 255);
-            ComButton(20,20,100,30,22,OPT_FLAT,texto_hora);
+            ComButton(20,20,100,30,22,OPT_FLAT,texto_hora_manana);
 
             ComFgcolor(170,170, 170);
             if(no_manana==1) ComFgcolor(0,255, 0);
@@ -1043,20 +990,37 @@ int main(void) {
             ComButton(10, 200, 70, 30, 22,OPT_CENTER, "CANCEL");
 
             Dibuja();
+            estado_anterior=estado_actual;
 
             if(Boton(20,70,100,30,22,"ABRIR") && no_manana==1)
             {
                 estado_actual=AbrirManana;
                 tiempo_inicio=segundos;
             }
-            if(Boton(20,20,100,30,22,texto_hora))
+            if(Boton(20,20,100,30,22,texto_hora_manana))
             {
                 estado_actual=ConfigHora1;
             }
             if(Boton(10, 200, 70, 30, 22,"CANCEL"))
             {
-                estado_actual=MananaInicio;
+                estado_actual=Inicio_i;
             }
+
+            if((no_manana==1 || no_tarde==1 || no_noche==1) && segundos>30)//Se envia mensaje por whatsapp a adulto
+
+
+                if(horas==alarma_manana && minutos==minutos_manana_ant)//Si se cumple el tiempo de la alarma de la manana
+                {
+                    estado_actual=AlarmaManana;
+                }
+                if(horas==alarma_tarde && minutos==minutos_tarde_ant)//Si se cumple el tiempo de la alarma de la tarde
+                {
+                    estado_actual=AlarmaTarde;
+                }
+                if(horas==alarma_noche && minutos==minutos_noche_ant)//Si se cumple el tiempo de la alarma de la noche
+                {
+                    estado_actual=AlarmaNoche;
+                }
 
 
 
@@ -1070,7 +1034,7 @@ int main(void) {
             set_color_azul();
             ComRect(0,0, HSIZE, VSIZE, true);
             set_color_blanco();
-            ComTXT(150,VSIZE/4,26,OPT_CENTER,"Selecciona hora a la que quiere la alarma?");
+            ComTXT(150,VSIZE/4,26,OPT_CENTER,"Selecciona hora a la que quiere la alarma");
 
             // ----- Etiquetas -----
             set_color_blanco();
@@ -1111,6 +1075,7 @@ int main(void) {
 
 
             Dibuja();
+            estado_anterior=estado_actual;
 
             if(Boton(75, 100, 30, 30, 22, "^"))//horas
             {
@@ -1158,6 +1123,22 @@ int main(void) {
                 minutos_manana=minutos_manana_ant;
             }
 
+            if((no_manana==1 || no_tarde==1 || no_noche==1) && segundos>30)//Se envia mensaje por whatsapp a adulto
+
+
+                if(horas==alarma_manana && minutos==minutos_manana_ant)//Si se cumple el tiempo de la alarma de la manana
+                {
+                    estado_actual=AlarmaManana;
+                }
+                if(horas==alarma_tarde && minutos==minutos_tarde_ant)//Si se cumple el tiempo de la alarma de la tarde
+                {
+                    estado_actual=AlarmaTarde;
+                }
+                if(horas==alarma_noche && minutos==minutos_noche_ant)//Si se cumple el tiempo de la alarma de la noche
+                {
+                    estado_actual=AlarmaNoche;
+                }
+
             break;
 
         case AbrirManana:
@@ -1169,13 +1150,14 @@ int main(void) {
             ComRect(0,0, HSIZE, VSIZE, true);
             set_color_blanco();
             ComTXT(HSIZE/2, VSIZE/3, 28, OPT_CENTER, "Recoja su pastilla");
+            no_manana=0;
 
             Dibuja();
 
             posicion=3233;
             PWMPulseWidthSet(PWM0_BASE, PWM_OUT_1, posicion);
 
-            if ((segundos - tiempo_inicio) >= 3) {  // han pasado 3 s
+            if ((segundos - tiempo_inicio) >= 5) {  // han pasado 5 s
                 estado_actual = Manana;
                 posicion=Min_pos;
                 PWMPulseWidthSet(PWM0_BASE, PWM_OUT_1, posicion);
@@ -1183,11 +1165,14 @@ int main(void) {
 
             break;
 
+
+            //--------------------------------------Usuario quiere poner alarma de tarde-----------------------------------------------//
+
         case Tarde:
 
             horas_tarde=alarma_tarde;
             minutos_tarde=minutos_tarde_ant;
-            sprintf(texto_hora, "%02d:%02d", alarma_tarde,minutos_tarde);   // convierte 12 → "12"
+            sprintf(texto_hora_tarde, "%02d:%02d", alarma_tarde,minutos_tarde);   // convierte 12 → "12"
 
             Nueva_pantalla(0x10,0x10,0x10);
 
@@ -1195,7 +1180,7 @@ int main(void) {
             set_color_azul();
             ComRect(0,0, HSIZE, VSIZE, true);
             ComFgcolor(255,255, 255);
-            ComButton(20,20,100,30,22,OPT_FLAT,texto_hora);
+            ComButton(20,20,100,30,22,OPT_FLAT,texto_hora_tarde);
 
             ComFgcolor(170,170, 170);
             if(no_tarde==1) ComFgcolor(0,255, 0);
@@ -1208,19 +1193,37 @@ int main(void) {
 
             Dibuja();
 
+            estado_anterior=estado_actual;
             if(Boton(20,70,100,30,22,"ABRIR") && no_tarde==1)
             {
                 estado_actual=AbrirTarde;
                 tiempo_inicio=segundos;
             }
-            if(Boton(20,20,100,30,22,texto_hora))
+            if(Boton(20,20,100,30,22,texto_hora_tarde))
             {
                 estado_actual=ConfigHora2;
             }
             if(Boton(10, 200, 70, 30, 22,"CANCEL"))
             {
-                estado_actual=TardeInicio;
+                estado_actual=Inicio_i;
             }
+
+            if((no_manana==1 || no_tarde==1 || no_noche==1) && segundos>30)//Se envia mensaje por whatsapp a adulto
+
+
+                if(horas==alarma_manana && minutos==minutos_manana_ant)//Si se cumple el tiempo de la alarma de la manana
+                {
+
+                    estado_actual=AlarmaManana;
+                }
+                if(horas==alarma_tarde && minutos==minutos_tarde_ant)//Si se cumple el tiempo de la alarma de la tarde
+                {
+                    estado_actual=AlarmaTarde;
+                }
+                if(horas==alarma_noche && minutos==minutos_noche_ant)//Si se cumple el tiempo de la alarma de la noche
+                {
+                    estado_actual=AlarmaNoche;
+                }
 
 
 
@@ -1317,6 +1320,23 @@ int main(void) {
                 minutos_tarde=minutos_tarde_ant;
             }
 
+            estado_anterior=estado_actual;
+            if((no_manana==1 || no_tarde==1 || no_noche==1) && segundos>30)//Se envia mensaje por whatsapp a adulto
+
+
+                if(horas==alarma_manana && minutos==minutos_manana_ant)//Si se cumple el tiempo de la alarma de la manana
+                {
+                    estado_actual=AlarmaManana;
+                }
+                if(horas==alarma_tarde && minutos==minutos_tarde_ant)//Si se cumple el tiempo de la alarma de la tarde
+                {
+                    estado_actual=AlarmaTarde;
+                }
+                if(horas==alarma_noche && minutos==minutos_noche_ant)//Si se cumple el tiempo de la alarma de la noche
+                {
+                    estado_actual=AlarmaNoche;
+                }
+
             break;
 
         case AbrirTarde:
@@ -1328,13 +1348,14 @@ int main(void) {
             ComRect(0,0, HSIZE, VSIZE, true);
             set_color_blanco();;
             ComTXT(HSIZE/2, VSIZE/3, 28, OPT_CENTER, "Recoja su pastilla");
+            no_tarde=0;
 
             Dibuja();
 
             posicion=3233;
             PWMPulseWidthSet(PWM0_BASE, PWM_OUT_4, posicion);
 
-            if ((segundos - tiempo_inicio) >= 3) {  // han pasado 3 s
+            if ((segundos - tiempo_inicio) >= 5) {  // han pasado 3 s
                 estado_actual = Tarde;
                 posicion=Min_pos;
                 PWMPulseWidthSet(PWM0_BASE, PWM_OUT_4, posicion);
@@ -1342,11 +1363,14 @@ int main(void) {
 
             break;
 
+
+            //--------------------------------------Usuario quiere poner alarma de noche-----------------------------------------------//
+
         case Noche:
 
             horas_noche=alarma_noche;
             minutos_noche=minutos_noche_ant;
-            sprintf(texto_hora, "%02d:%02d", alarma_noche,minutos_noche);   // convierte 12 → "12"
+            sprintf(texto_hora_noche, "%02d:%02d", alarma_noche,minutos_noche);   // convierte 12 → "12"
 
             Nueva_pantalla(0x10,0x10,0x10);
 
@@ -1354,7 +1378,7 @@ int main(void) {
             set_color_azul();
             ComRect(0,0, HSIZE, VSIZE, true);
             ComFgcolor(255,255, 255);
-            ComButton(20,20,100,30,22,OPT_FLAT,texto_hora);
+            ComButton(20,20,100,30,22,OPT_FLAT,texto_hora_noche);
 
             ComFgcolor(170,170, 170);
             if(no_noche==1) ComFgcolor(0,255, 0);
@@ -1366,20 +1390,37 @@ int main(void) {
             ComButton(10, 200, 70, 30, 22,OPT_CENTER, "CANCEL");
 
             Dibuja();
+            estado_anterior=estado_actual;
 
             if(Boton(20,70,100,30,22,"ABRIR") && no_noche==1)
             {
                 estado_actual=AbrirNoche;
                 tiempo_inicio=segundos;
             }
-            if(Boton(20,20,100,30,22,texto_hora))
+            if(Boton(20,20,100,30,22,texto_hora_noche))
             {
                 estado_actual=ConfigHora3;
             }
             if(Boton(10, 200, 70, 30, 22,"CANCEL"))
             {
-                estado_actual=NocheInicio;
+                estado_actual=Inicio_i;
             }
+
+            if((no_manana==1 || no_tarde==1 || no_noche==1) && segundos>30)//Se envia mensaje por whatsapp a adulto
+
+
+                if(horas==alarma_manana && minutos==minutos_manana_ant)//Si se cumple el tiempo de la alarma de la manana
+                {
+                    estado_actual=AlarmaManana;
+                }
+                if(horas==alarma_tarde && minutos==minutos_tarde_ant)//Si se cumple el tiempo de la alarma de la tarde
+                {
+                    estado_actual=AlarmaTarde;
+                }
+                if(horas==alarma_noche && minutos==minutos_noche_ant)//Si se cumple el tiempo de la alarma de la noche
+                {
+                    estado_actual=AlarmaNoche;
+                }
 
 
 
@@ -1476,6 +1517,22 @@ int main(void) {
                 minutos_noche=minutos_noche_ant;
             }
 
+            estado_anterior=estado_actual;
+            if((no_manana==1 || no_tarde==1 || no_noche==1) && segundos>30)//Se envia mensaje por whatsapp a adulto
+
+
+                if(horas==alarma_manana && minutos==minutos_manana_ant)//Si se cumple el tiempo de la alarma de la manana
+                {
+                    estado_actual=AlarmaManana;
+                }
+                if(horas==alarma_tarde && minutos==minutos_tarde_ant)//Si se cumple el tiempo de la alarma de la tarde
+                {
+                    estado_actual=AlarmaTarde;
+                }
+                if(horas==alarma_noche && minutos==minutos_noche_ant)//Si se cumple el tiempo de la alarma de la noche
+                {
+                    estado_actual=AlarmaNoche;
+                }
             break;
 
         case AbrirNoche:
@@ -1487,13 +1544,14 @@ int main(void) {
             ComRect(0,0, HSIZE, VSIZE, true);
             set_color_blanco();
             ComTXT(HSIZE/2, VSIZE/3, 28, OPT_CENTER, "Recoja su pastilla");
+            no_noche=0;
 
             Dibuja();
 
             posicion=3233;
             PWMPulseWidthSet(PWM0_BASE, PWM_OUT_3, posicion);
 
-            if ((segundos - tiempo_inicio) >= 3) {  // han pasado 3 s
+            if ((segundos - tiempo_inicio) >= 5) {  // han pasado 3 s
                 estado_actual = Noche;
                 posicion=Min_pos;
                 PWMPulseWidthSet(PWM0_BASE, PWM_OUT_3, posicion);
@@ -1501,6 +1559,147 @@ int main(void) {
 
             break;
 
+        case AlarmaManana :
+            Nueva_pantalla(0x10,0x10,0x10);
+
+
+                        set_color_negro();
+                        ComRect(0,0, HSIZE, VSIZE, true);
+                        set_color_blanco();
+                        ComTXT(HSIZE/2, VSIZE/3, 28, OPT_CENTER, "ALARMA MANANA");
+                        if(parp==1)
+                        {
+                            set_color_blanco();
+                            ComTXT(HSIZE/2, VSIZE/2, 28, OPT_CENTER, texto_hora_manana);
+                        }
+                        else
+                        {
+                            set_color_negro();
+                            ComTXT(HSIZE/2, VSIZE/2, 28, OPT_CENTER, texto_hora_manana);
+                        }
+
+                        // ----- BotÃ³n Apagar -----
+                        ComColor(0,0,0);
+                        ComFgcolor(0,255, 0);
+                        ComButton(280, 200, 70, 30, 22,OPT_CENTER, "Apagar");
+
+                        // ----- BotÃ³n Cancelar -----
+                        ComColor(0,0,0);
+                        ComFgcolor(255,0, 0);
+                        ComButton(10, 200, 70, 30, 22,OPT_CENTER, "Cancelar");
+
+                        Dibuja();
+                        if(Boton(280, 200, 70, 30, 22, "Apagar"))
+                                   {
+                                       estado_actual=estado_anterior;
+                                       alarma_manana=0;
+                                       minutos_manana_ant=0;
+
+                                   }
+                        if(Boton(10, 200, 70, 30, 22, "Cancelar"))
+                                   {
+                                       estado_actual=estado_anterior;
+
+                                   }
+
+            break;
+
+        case AlarmaTarde :
+
+            Nueva_pantalla(0x10,0x10,0x10);
+
+
+                        set_color_negro();
+                        ComRect(0,0, HSIZE, VSIZE, true);
+                        set_color_blanco();
+                        ComTXT(HSIZE/2, VSIZE/3, 28, OPT_CENTER, "ALARMA TARDE");
+                        if(parp==1)
+                        {
+                            set_color_blanco();
+                            ComTXT(HSIZE/2, VSIZE/2, 28, OPT_CENTER, texto_hora_tarde);
+                        }
+                        else
+                        {
+                            set_color_negro();
+                            ComTXT(HSIZE/2, VSIZE/2, 28, OPT_CENTER, texto_hora_tarde);
+                        }
+
+                        // ----- BotÃ³n Apagar -----
+                        ComColor(0,0,0);
+                        ComFgcolor(0,255, 0);
+                        ComButton(280, 200, 70, 30, 22,OPT_CENTER, "Apagar");
+
+                        // ----- BotÃ³n Cancelar -----
+                        ComColor(0,0,0);
+                        ComFgcolor(255,0, 0);
+                        ComButton(10, 200, 70, 30, 22,OPT_CENTER, "Cancelar");
+
+                        Dibuja();
+                        if(Boton(280, 200, 70, 30, 22, "Apagar"))
+                                   {
+                                       estado_actual=estado_anterior;
+                                       alarma_tarde=0;
+                                       minutos_tarde_ant=0;
+
+
+                                   }
+                        if(Boton(10, 200, 70, 30, 22, "Cancelar"))
+                                   {
+                                       estado_actual=estado_anterior;
+
+                                   }
+
+            break;
+
+        case AlarmaNoche :
+
+            Nueva_pantalla(0x10,0x10,0x10);
+
+
+                        set_color_negro();
+                        ComRect(0,0, HSIZE, VSIZE, true);
+                        set_color_blanco();
+                        ComTXT(HSIZE/2, VSIZE/3, 28, OPT_CENTER, "ALARMA NOCHE");
+                        if(parp==1)
+                        {
+                            set_color_blanco();
+                            ComTXT(HSIZE/2, VSIZE/2, 28, OPT_CENTER, texto_hora_noche);
+                        }
+                        else
+                        {
+                            set_color_negro();
+                            ComTXT(HSIZE/2, VSIZE/2, 28, OPT_CENTER, texto_hora_noche);
+                        }
+
+                        // ----- BotÃ³n Apagar -----
+                        ComColor(0,0,0);
+                        ComFgcolor(0,255, 0);
+                        ComButton(280, 200, 70, 30, 22,OPT_CENTER, "Apagar");
+
+                        // ----- BotÃ³n Cancelar -----
+                        ComColor(0,0,0);
+                        ComFgcolor(255,0, 0);
+                        ComButton(10, 200, 70, 30, 22,OPT_CENTER, "Cancelar");
+
+                        Dibuja();
+
+                        if(Boton(280, 200, 70, 30, 22, "Apagar"))
+                                   {
+                                       estado_actual=estado_anterior;
+                                       alarma_noche=0;
+                                       minutos_noche_ant=0;
+
+
+                                   }
+                        if(Boton(10, 200, 70, 30, 22, "Cancelar"))
+                                   {
+                                       estado_actual=estado_anterior;
+                                       alarma_noche=0;
+                                       minutos_noche_ant=0;
+
+                                   }
+
+            break;
 
         }
     }
@@ -1534,6 +1733,14 @@ void IntTimer0(void)
     }
 }
 
+void IntTimer1(void)
+{
+    TimerIntClear(TIMER1_BASE, TIMER_TIMA_TIMEOUT); // Borra flag
+    SysCtlDelay(20); //Retraso necesario. Mirar Driverlib p.550-->delay suficiente para que se borre el timer
+    Flag_ints++;
+
+    parp=!parp; //variable que se devuelve 1 o 0 cada 125 ms
+}
 
 
 
