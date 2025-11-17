@@ -116,10 +116,12 @@ enum estados estado_actual, estado_anterior;
 //----------------------------------Variables---------------------------------//
 
 const char *semana[]= {"LUN","MAR","MIE","JUE","VIE","SAB","DOM"}; //Dias de la semana que puede introducir el usuario
+char *semana_completa[] = {"Lunes","Martes","Miercoles","Jueves","Viernes","Sabado","Domingo"};
 char dia[4];//variable donde se registra el dia por el usuario
 char hora[3];//variable donde se registra la hora por el usuario
 char minuto[3];//variable donde se registra el minuto por el usuario
 char buffer[10]; //Variable para guardar la hora en el que el usuario se ha tomado una pastilla
+
 
 char c;//variable que registra lo que guarda el usuario
 int h;//variable que registra el valor numerico de la hora introducida
@@ -127,9 +129,9 @@ int m;//variable que registra el valor numerico del minuto introducido
 
 int dias,horas, minutos, segundos; //hora calculada por el micro
 int horas_manana=0, minutos_manana=0;//variables para modificar la hora en la que se ha tomado la primera pastilla
-int horas_tarde=0, minutos_tarde=0;//variables para modificar la hora en la que se ha tomado la segunda pastilla
+int horas_tarde=12, minutos_tarde=0;//variables para modificar la hora en la que se ha tomado la segunda pastilla
 int minutos_tarde_ant=0, minutos_manana_ant=0, minutos_noche_ant=0;
-int horas_noche=0, minutos_noche=0;//variables para modificar la hora en la que se ha tomado la tercera pastilla
+int horas_noche=18, minutos_noche=0;//variables para modificar la hora en la que se ha tomado la tercera pastilla
 int alarma_manana=7, alarma_tarde=15, alarma_noche=23;//Alarmas predeterminadas cada 8h--> a modificar por el usuario segun la pastilla que necesite
 char texto_hora_manana[10], texto_hora_tarde[10], texto_hora_noche[10];//variable para escribir la alarma predeterminada
 char buffer2[9]; //Variable que imprime la hora en la pantalla
@@ -221,7 +223,7 @@ int main(void) {
     SysCtlPeripheralEnable(SYSCTL_PERIPH_GPION);
     GPIOPinTypeGPIOOutput(GPIO_PORTN_BASE, GPIO_PIN_0 |GPIO_PIN_1);
 
-    //Habilitar los perifÃ©ricos implicados: GPIOF, J, N
+    //Habilitar los perifericos implicados: GPIOF, J, N
     SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
     SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOG);
     SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOJ);
@@ -242,7 +244,7 @@ int main(void) {
     GPIOPinTypePWM(GPIO_PORTF_BASE, GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3 );
     GPIOPinTypePWM(GPIO_PORTG_BASE, GPIO_PIN_0);
 
-    //Configurar el pwm0, contador descendente y sin sincronizaciÃ³n (actualizaciÃ³n automÃ¡tica)
+    //Configurar el pwm0, contador descendente y sin sincronizacion (actualizacion automatica)
     PWMGenConfigure(PWM0_BASE, PWM_GEN_0, PWM_GEN_MODE_DOWN | PWM_GEN_MODE_NO_SYNC);
     PWMGenConfigure(PWM0_BASE, PWM_GEN_1, PWM_GEN_MODE_DOWN | PWM_GEN_MODE_NO_SYNC);
     PWMGenConfigure(PWM0_BASE, PWM_GEN_2, PWM_GEN_MODE_DOWN | PWM_GEN_MODE_NO_SYNC);
@@ -344,7 +346,7 @@ int main(void) {
             set_color_azul();
             ComRect(0,0, HSIZE, VSIZE, true);
             set_color_blanco();
-            ComTXT(HSIZE/2,VSIZE/2,26,OPT_CENTER,"Introduce Dia, Hora y minuto en el ordenador");
+            ComTXT(HSIZE/2,VSIZE/2,26,OPT_CENTER,"Introduce Dia, Hora y Minuto en el ordenador");
 
             Dibuja();
 
@@ -373,9 +375,17 @@ int main(void) {
             if(UARTCharsAvail(UART0_BASE))
             {
                 c = UARTCharGetNonBlocking(UART0_BASE);
-                dia[1] = c;
-                UARTCharPutNonBlocking(UART0_BASE, c);
-                estado_actual = Dia3;
+                if (c == 0x08) {
+                    // borrar el caracter anterior
+                    dia[0] = '\0';
+                    UARTprintf("\b \b");  // borrar en pantalla
+                    estado_actual = Dia1;
+                }
+                else {
+                    dia[1] = c;
+                    UARTCharPutNonBlocking(UART0_BASE, c);
+                    estado_actual = Dia3;
+                }
             }
 
             break;
@@ -384,11 +394,18 @@ int main(void) {
             if(UARTCharsAvail(UART0_BASE))
             {
                 c = UARTCharGetNonBlocking(UART0_BASE);
-                dia[2] = c;
-                dia[3] = '\0'; // fin de cadena
-                UARTCharPutNonBlocking(UART0_BASE, c);
-                UARTCharPut(UART0_BASE, '\n');
-                estado_actual = Verificacion_dia;
+                if (c == 0x08) {
+                    dia[1] = '\0';
+                    UARTprintf("\b \b");
+                    estado_actual = Dia2;
+                }
+                else {
+                    dia[2] = c;
+                    dia[3] = '\0';
+                    UARTCharPutNonBlocking(UART0_BASE, c);
+                    UARTCharPut(UART0_BASE, '\n');
+                    estado_actual = Verificacion_dia;
+                }
 
             }
 
@@ -399,8 +416,8 @@ int main(void) {
             if (idx >= 0)
             { // dia correcto
 
-                UARTprintf("Dia valido: %s\n", semana[idx]);
-                UARTprintf("\n Introuzca la hora del dia (1-24):\n");
+                UARTprintf("Dia valido: %s\n", semana_completa[idx]);
+                UARTprintf("Introuzca la hora del dia (1-24):\n");
                 estado_actual = Hora1;
             }
             else
@@ -418,14 +435,17 @@ int main(void) {
         case Hora1:
             if (UARTCharsAvail(UART0_BASE)) {
                 c = UARTCharGetNonBlocking(UART0_BASE);
-                if (c >= '0' && c <= '9') {
+                if (c == 0x08) {
+                    // No hay nada que borrar
+                }
+                else if (c >= '0' && c <= '9') {
                     hora[0] = c;
                     UARTCharPutNonBlocking(UART0_BASE, c);
                     estado_actual = Hora2;
                 }
                 else {
-                    UARTprintf("\nError: solo se permiten nÃºmeros.\n");
-                    UARTprintf("\nIntroducir de nuevo:\n");
+                    UARTprintf("Error: solo se permiten números.\n");
+                    UARTprintf("Introducir de nuevo:\n");
                     estado_actual = Hora1;
                 }
             }
@@ -435,15 +455,22 @@ int main(void) {
             if (UARTCharsAvail(UART0_BASE)) {
                 c = UARTCharGetNonBlocking(UART0_BASE);
 
-                // Verificar si es un digito
-                if (c >= '0' && c <= '9') {
+                if (c == 0x08) {
+                    // Borrar primer dígito
+                    hora[0] = '\0';
+                    UARTprintf("\b \b");
+                    estado_actual = Hora1;
+                }
+                else if (c >= '0' && c <= '9') {
                     hora[1] = c;
                     hora[2] = '\0';
                     UARTCharPutNonBlocking(UART0_BASE, c);
+                    UARTCharPut(UART0_BASE, '\n');
                     estado_actual = Verificacion_hora;
-                } else {
-                    UARTprintf("\nError: solo se permiten nÃºmeros.\n");
-                    UARTprintf("\nIntroducir de nuevo:\n");
+                }
+                else {
+                    UARTprintf("Error: solo se permiten números.\n");
+                    UARTprintf("Introducir de nuevo:\n");
                     estado_actual = Hora1;
                 }
             }
@@ -454,14 +481,14 @@ int main(void) {
 
             if (h >= 1 && h <= 24)
             {
-                UARTprintf("\nHora correcta: %d\n", h);
-                UARTprintf("\nIntroducir minuto(0-59): \n");
+                UARTprintf("Hora correcta: %d\n", h);
+                UARTprintf("Introducir minuto(0-59): \n");
                 horas=h;
                 estado_actual = Min1; // siguiente paso
             }
             else
             {
-                UARTprintf("\nError: hora incorrecta\n");
+                UARTprintf("Error: hora incorrecta\n");
                 UARTprintf("Introducir de nuevo\n");
                 estado_actual = Hora1;
             }
@@ -474,14 +501,18 @@ int main(void) {
         case Min1:
             if (UARTCharsAvail(UART0_BASE)) {
                 c = UARTCharGetNonBlocking(UART0_BASE);
-                if (c >= '0' && c <= '9') {
+
+                if (c == 0x08) {
+                    // No hay nada que borrar aquí
+                }
+                else if (c >= '0' && c <= '9') {
                     minuto[0] = c;
                     UARTCharPutNonBlocking(UART0_BASE, c);
                     estado_actual = Min2;
                 }
                 else {
-                    UARTprintf("\nError: solo se permiten numeros.\n");
-                    UARTprintf("\nIntroducir de nuevo:\n");
+                    UARTprintf("Error: solo se permiten numeros.\n");
+                    UARTprintf("Introducir de nuevo:\n");
                     estado_actual = Min1;
                 }
             }
@@ -490,16 +521,22 @@ int main(void) {
         case Min2:
             if (UARTCharsAvail(UART0_BASE)) {
                 c = UARTCharGetNonBlocking(UART0_BASE);
-
-                // Verificar si es un digito
-                if (c >= '0' && c <= '9') {
+                if (c == 0x08) {
+                    // Borrar minuto[0]
+                    minuto[0] = '\0';
+                    UARTprintf("\b \b");
+                    estado_actual = Min1;
+                }
+                else if (c >= '0' && c <= '9') {
                     minuto[1] = c;
                     minuto[2] = '\0';
                     UARTCharPutNonBlocking(UART0_BASE, c);
+                    UARTCharPut(UART0_BASE, '\n');
                     estado_actual = Verificacion_min;
-                } else {
-                    UARTprintf("\nError: solo se permiten numeros.\n");
-                    UARTprintf("\nIntroducir de nuevo:\n");
+                }
+                else {
+                    UARTprintf("Error: solo se permiten numeros.\n");
+                    UARTprintf("Introducir de nuevo:\n");
                     estado_actual = Min1;
                 }
             }
@@ -510,11 +547,11 @@ int main(void) {
 
             if (m >= 0 && m <= 60)
             {
-                UARTprintf("\nMinuto correcto: %d\n", m);
+                UARTprintf("Minuto correcto: %d\n", m);
                 minutos=m;
                 if(horas>=6 && horas<12)estado_actual = Reposo1;
                 if(horas>=12 && horas<=18)estado_actual = Reposo2;
-                if(horas>=18 && horas<24)estado_actual = Reposo3;
+                if(horas>=18 && horas<=24)estado_actual = Reposo3;
 
             }
             else
@@ -580,13 +617,13 @@ int main(void) {
             ComTXT(90, 80, 26, OPT_CENTER, "HORA");
             ComTXT(210, 80, 26, OPT_CENTER, "MINUTO");
 
-            // ----- TriÃ¡ngulos arriba -----
+            // ----- Triangulos arriba -----
             ComColor(0,0,0);
             ComFgcolor(0,0, 255);
             ComButton(75, 100, 30, 35, 22,OPT_FLAT, "^");   // â–² hora
             ComButton(195, 100, 30, 35, 22,OPT_FLAT, "^"); // â–² minuto
 
-            // ----- NÃºmeros -----
+            // ----- Numeros -----
             set_color_blanco();
             ComRect(80,140, 100, 160, true);
             ComRect(200,140, 220, 160, true);
@@ -596,13 +633,13 @@ int main(void) {
             sprintf(buffer, "%02d", minutos_manana);
             ComTXT(210, 150, 28, OPT_CENTER, buffer);
 
-            // ----- TriÃ¡ngulos abajo -----
+            // ----- Triangulos abajo -----
             ComColor(0,0,0);
             ComFgcolor(0,0, 255);
             ComButton(75, 170, 30, 35, 22,OPT_FLAT, "v");   // â–¼ hora
             ComButton(195, 170, 30, 35, 22,OPT_FLAT, "v"); // â–¼ minuto
 
-            // ----- BotÃ³n OK -----
+            // ----- Boton OK -----
             ComColor(0,0,0);
             ComFgcolor(0,255, 0);
             ComButton(280, 200, 30, 30, 22,OPT_CENTER, "OK");
@@ -707,13 +744,13 @@ int main(void) {
             ComTXT(90, 80, 26, OPT_CENTER, "HORA");
             ComTXT(210, 80, 26, OPT_CENTER, "MINUTO");
 
-            // ----- TriÃ¡ngulos arriba -----
+            // ----- Triangulos arriba -----
             ComColor(0,0,0);
             ComFgcolor(0,0, 255);
             ComButton(75, 100, 30, 35, 22,OPT_FLAT, "^");   // â–² hora
             ComButton(195, 100, 30, 35, 22,OPT_FLAT, "^"); // â–² minuto
 
-            // ----- NÃºmeros -----
+            // ----- Numeros -----
             set_color_blanco();
             ComRect(80,140, 100, 160, true);
             ComRect(200,140, 220, 160, true);
@@ -723,13 +760,13 @@ int main(void) {
             sprintf(buffer, "%02d", minutos_tarde);
             ComTXT(210, 150, 28, OPT_CENTER, buffer);
 
-            // ----- TriÃ¡ngulos abajo -----
+            // ----- Triangulos abajo -----
             ComColor(0,0,0);
             ComFgcolor(0,0, 255);
             ComButton(75, 170, 30, 35, 22,OPT_FLAT, "v");   // â–¼ hora
             ComButton(195, 170, 30, 35, 22,OPT_FLAT, "v"); // â–¼ minuto
 
-            // ----- BotÃ³n OK -----
+            // ----- Boton OK -----
             ComColor(0,0,0);
             ComFgcolor(0,255, 0);
             ComButton(280, 200, 30, 30, 22,OPT_CENTER, "OK");
@@ -832,13 +869,13 @@ int main(void) {
             ComTXT(90, 80, 26, OPT_CENTER, "HORA");
             ComTXT(210, 80, 26, OPT_CENTER, "MINUTO");
 
-            // ----- TriÃ¡ngulos arriba -----
+            // ----- Triangulos arriba -----
             ComColor(0,0,0);
             ComFgcolor(0,0, 255);
             ComButton(75, 100, 30, 35, 22,OPT_FLAT, "^");   // â–² hora
             ComButton(195, 100, 30, 35, 22,OPT_FLAT, "^"); // â–² minuto
 
-            // ----- NÃºmeros -----
+            // ----- Numeros -----
             set_color_blanco();
             ComRect(80,140, 100, 160, true);
             ComRect(200,140, 220, 160, true);
@@ -848,13 +885,13 @@ int main(void) {
             sprintf(buffer, "%02d", minutos_noche);
             ComTXT(210, 150, 28, OPT_CENTER, buffer);
 
-            // ----- TriÃ¡ngulos abajo -----
+            // ----- Triangulos abajo -----
             ComColor(0,0,0);
             ComFgcolor(0,0, 255);
             ComButton(75, 170, 30, 35, 22,OPT_FLAT, "v");   // â–¼ hora
             ComButton(195, 170, 30, 35, 22,OPT_FLAT, "v"); // â–¼ minuto
 
-            // ----- BotÃ³n OK -----
+            // ----- Boton OK -----
             ComColor(0,0,0);
             ComFgcolor(0,255, 0);
             ComButton(280, 200, 30, 30, 22,OPT_CENTER, "OK");
@@ -902,7 +939,7 @@ int main(void) {
 
         case Inicio_i:
 
-            sprintf(buffer, "%02d:%02d:%02d", horas, minutos, segundos);
+
 
             Nueva_pantalla(0x10,0x10,0x10);
 
@@ -912,16 +949,21 @@ int main(void) {
 
 
             //DIA DE LA SEMANA
-            sprintf(buffer2, "%02d:%02d:%02d", horas, minutos, segundos);
-            set_color_blanco();             // borrar fondo de la hora
-            ComRect(53,30,265,90,true);
-            set_color_negro();              // color del texto hora
-            ComTXT((53+265)/2, (30+90)/2, 28, OPT_CENTER, buffer); // dibuja la hora centrada
+            sprintf(buffer, "%02d:%02d:%02d", horas, minutos, segundos);
+            set_color_blanco();
+            ComRect(53, 30, 265, 90, true);
+
+            set_color_negro();
+            ComTXT((53+265)/2, (30+90)/2 - 10, 28, OPT_CENTER, buffer); // hora centrada un poco hacia arriba
+
+            // DIBUJAR DIA DE LA SEMANA DEBAJO
+            set_color_negro();
+            ComTXT((53+265)/2, (30+90)/2 + 20, 22, OPT_CENTER, semana_completa[idx]); // dia debajo
 
             //BOTONES
             ComColor(0,0,0);
             ComFgcolor(255*r_manana,255*g_manana,255*b_manana);
-            ComButton(20, 140, 80, 80, 22,OPT_FLAT, "M");//boton maÃ±ana
+            ComButton(20, 140, 80, 80, 22,OPT_FLAT, "M");//boton manana
             ComFgcolor(255*r_tarde,255*g_tarde,255*b_tarde);
             ComButton(116, 140, 80, 80, 22,OPT_FLAT, "T");//boton tarde
             ComFgcolor(255*r_noche,255*g_noche,255*b_noche);
@@ -930,19 +972,34 @@ int main(void) {
             Dibuja();
             estado_anterior=estado_actual;
 
+            if(horas>=2 && horas<=3){//Se reinicia todo a las 2 de la manana
+                r_manana=255;
+                g_manana=255;
+                b_manana=255;
+
+                r_tarde=255;
+                g_tarde=255;
+                b_tarde=255;
+
+                r_noche=255;
+                g_noche=255;
+                b_noche=255;
+
+            }
+
             if((no_manana==1 || no_tarde==1 || no_noche==1) && segundos>30)//Se envia mensaje por whatsapp a adulto
 
-                if(Boton(20, 140, 80, 80,28, "M")) //Si aprieto boton Pieza A
+                if(Boton(20, 140, 80, 80,28, "M")) //Si aprieto boton M
                 {
                     estado_actual=Manana;
 
                 }
-                if(Boton(116, 140, 80, 80,28, "T")) //Si aprieto boton Pieza A
+                if(Boton(116, 140, 80, 80,28, "T")) //Si aprieto boton T
                 {
                     estado_actual=Tarde;
 
                 }
-                if(Boton(212, 140, 80, 80,28, "N")) //Si aprieto boton Pieza A
+                if(Boton(212, 140, 80, 80,28, "N")) //Si aprieto boton N
                 {
                     estado_actual=Noche;
 
@@ -984,7 +1041,7 @@ int main(void) {
             if(no_manana==1) ComFgcolor(0,255, 0);
             ComButton(20,70,100,30,22,OPT_FLAT,"ABRIR");
 
-            // ----- BotÃ³n CANCEL -----
+            // ----- Boton CANCEL -----
             ComColor(0,0,0);
             ComFgcolor(255,0, 0);
             ComButton(10, 200, 70, 30, 22,OPT_CENTER, "CANCEL");
@@ -1041,13 +1098,13 @@ int main(void) {
             ComTXT(90, 80, 26, OPT_CENTER, "HORA");
             ComTXT(210, 80, 26, OPT_CENTER, "MINUTO");
 
-            // ----- TriÃ¡ngulos arriba -----
+            // ----- Triangulos arriba -----
             ComColor(0,0,0);
             ComFgcolor(0,0, 255);
             ComButton(75, 100, 30, 35, 22,OPT_FLAT, "^");   // â–² hora
             ComButton(195, 100, 30, 35, 22,OPT_FLAT, "^"); // â–² minuto
 
-            // ----- NÃºmeros -----
+            // ----- Numeros -----
             set_color_blanco();
             ComRect(80,140, 100, 160, true);
             ComRect(200,140, 220, 160, true);
@@ -1057,18 +1114,18 @@ int main(void) {
             sprintf(buffer, "%02d", minutos_manana);
             ComTXT(210, 150, 28, OPT_CENTER, buffer);
 
-            // ----- TriÃ¡ngulos abajo -----
+            // ----- Triangulos abajo -----
             ComColor(0,0,0);
             ComFgcolor(0,0, 255);
             ComButton(75, 170, 30, 35, 22,OPT_FLAT, "v");   // â–¼ hora
             ComButton(195, 170, 30, 35, 22,OPT_FLAT, "v"); // â–¼ minuto
 
-            // ----- BotÃ³n OK -----
+            // ----- Boton OK -----
             ComColor(0,0,0);
             ComFgcolor(0,255, 0);
             ComButton(280, 200, 30, 30, 22,OPT_CENTER, "OK");
 
-            // ----- BotÃ³n CANCEL -----
+            // ----- Boton CANCEL -----
             ComColor(0,0,0);
             ComFgcolor(255,0, 0);
             ComButton(10, 200, 70, 30, 22,OPT_CENTER, "CANCEL");
@@ -1151,6 +1208,9 @@ int main(void) {
             set_color_blanco();
             ComTXT(HSIZE/2, VSIZE/3, 28, OPT_CENTER, "Recoja su pastilla");
             no_manana=0;
+            r_manana=0;
+            g_manana=1;
+            b_manana=0;
 
             Dibuja();
 
@@ -1186,7 +1246,7 @@ int main(void) {
             if(no_tarde==1) ComFgcolor(0,255, 0);
             ComButton(20,70,100,30,22,OPT_FLAT,"ABRIR");
 
-            // ----- BotÃ³n CANCEL -----
+            // ----- Boton CANCEL -----
             ComColor(0,0,0);
             ComFgcolor(255,0, 0);
             ComButton(10, 200, 70, 30, 22,OPT_CENTER, "CANCEL");
@@ -1244,13 +1304,13 @@ int main(void) {
             ComTXT(90, 80, 26, OPT_CENTER, "HORA");
             ComTXT(210, 80, 26, OPT_CENTER, "MINUTO");
 
-            // ----- TriÃ¡ngulos arriba -----
+            // ----- Triangulos arriba -----
             ComColor(0,0,0);
             ComFgcolor(0,0, 255);
             ComButton(75, 100, 30, 35, 22,OPT_FLAT, "^");   // â–² hora
             ComButton(195, 100, 30, 35, 22,OPT_FLAT, "^"); // â–² minuto
 
-            // ----- NÃºmeros -----
+            // ----- Numeros -----
             set_color_blanco();
             ComRect(80,140, 100, 160, true);
             ComRect(200,140, 220, 160, true);
@@ -1260,18 +1320,18 @@ int main(void) {
             sprintf(buffer, "%02d", minutos_tarde);
             ComTXT(210, 150, 28, OPT_CENTER, buffer);
 
-            // ----- TriÃ¡ngulos abajo -----
+            // ----- Triangulos abajo -----
             ComColor(0,0,0);
             ComFgcolor(0,0, 255);
             ComButton(75, 170, 30, 35, 22,OPT_FLAT, "v");   // â–¼ hora
             ComButton(195, 170, 30, 35, 22,OPT_FLAT, "v"); // â–¼ minuto
 
-            // ----- BotÃ³n OK -----
+            // ----- Boton OK -----
             ComColor(0,0,0);
             ComFgcolor(0,255, 0);
             ComButton(280, 200, 30, 30, 22,OPT_CENTER, "OK");
 
-            // ----- BotÃ³n CANCEL -----
+            // ----- Boton CANCEL -----
             ComColor(0,0,0);
             ComFgcolor(255,0, 0);
             ComButton(10, 200, 70, 30, 22,OPT_CENTER, "CANCEL");
@@ -1349,6 +1409,9 @@ int main(void) {
             set_color_blanco();;
             ComTXT(HSIZE/2, VSIZE/3, 28, OPT_CENTER, "Recoja su pastilla");
             no_tarde=0;
+            r_tarde=0;
+            g_tarde=1;
+            b_tarde=0;
 
             Dibuja();
 
@@ -1384,7 +1447,7 @@ int main(void) {
             if(no_noche==1) ComFgcolor(0,255, 0);
             ComButton(20,70,100,30,22,OPT_FLAT,"ABRIR");
 
-            // ----- BotÃ³n CANCEL -----
+            // ----- Boton CANCEL -----
             ComColor(0,0,0);
             ComFgcolor(255,0, 0);
             ComButton(10, 200, 70, 30, 22,OPT_CENTER, "CANCEL");
@@ -1441,13 +1504,13 @@ int main(void) {
             ComTXT(90, 80, 26, OPT_CENTER, "HORA");
             ComTXT(210, 80, 26, OPT_CENTER, "MINUTO");
 
-            // ----- TriÃ¡ngulos arriba -----
+            // ----- Triangulos arriba -----
             ComColor(0,0,0);
             ComFgcolor(0,0, 255);
             ComButton(75, 100, 30, 35, 22,OPT_FLAT, "^");   // â–² hora
             ComButton(195, 100, 30, 35, 22,OPT_FLAT, "^"); // â–² minuto
 
-            // ----- NÃºmeros -----
+            // ----- Numeros -----
             set_color_blanco();
             ComRect(80,140, 100, 160, true);
             ComRect(200,140, 220, 160, true);
@@ -1457,18 +1520,18 @@ int main(void) {
             sprintf(buffer, "%02d", minutos_noche);
             ComTXT(210, 150, 28, OPT_CENTER, buffer);
 
-            // ----- TriÃ¡ngulos abajo -----
+            // ----- Triangulos abajo -----
             ComColor(0,0,0);
             ComFgcolor(0,0, 255);
             ComButton(75, 170, 30, 35, 22,OPT_FLAT, "v");   // â–¼ hora
             ComButton(195, 170, 30, 35, 22,OPT_FLAT, "v"); // â–¼ minuto
 
-            // ----- BotÃ³n OK -----
+            // ----- Boton OK -----
             ComColor(0,0,0);
             ComFgcolor(0,255, 0);
             ComButton(280, 200, 30, 30, 22,OPT_CENTER, "OK");
 
-            // ----- BotÃ³n CANCEL -----
+            // ----- Botonn CANCEL -----
             ComColor(0,0,0);
             ComFgcolor(255,0, 0);
             ComButton(10, 200, 70, 30, 22,OPT_CENTER, "CANCEL");
@@ -1545,6 +1608,9 @@ int main(void) {
             set_color_blanco();
             ComTXT(HSIZE/2, VSIZE/3, 28, OPT_CENTER, "Recoja su pastilla");
             no_noche=0;
+            r_noche=0;
+            g_noche=1;
+            b_noche=0;
 
             Dibuja();
 
@@ -1559,12 +1625,16 @@ int main(void) {
 
             break;
 
+
+            //--------------------------------------Alarmas-----------------------------------------------//
+
         case AlarmaManana :
             Nueva_pantalla(0x10,0x10,0x10);
 
 
+                        VolNota(255);        // volumen
+                        TocaNota(S_BEEP, 50);
                         set_color_negro();
-                        ComRect(0,0, HSIZE, VSIZE, true);
                         set_color_blanco();
                         ComTXT(HSIZE/2, VSIZE/3, 28, OPT_CENTER, "ALARMA MANANA");
                         if(parp==1)
@@ -1578,27 +1648,32 @@ int main(void) {
                             ComTXT(HSIZE/2, VSIZE/2, 28, OPT_CENTER, texto_hora_manana);
                         }
 
-                        // ----- BotÃ³n Apagar -----
+                        // ----- Boton Apagar -----
                         ComColor(0,0,0);
                         ComFgcolor(0,255, 0);
-                        ComButton(280, 200, 70, 30, 22,OPT_CENTER, "Apagar");
+                        ComButton(250, 200, 70, 30, 22,OPT_CENTER, "Apagar");
 
-                        // ----- BotÃ³n Cancelar -----
+                        // ----- Boton Cancelar -----
                         ComColor(0,0,0);
                         ComFgcolor(255,0, 0);
                         ComButton(10, 200, 70, 30, 22,OPT_CENTER, "Cancelar");
 
                         Dibuja();
-                        if(Boton(280, 200, 70, 30, 22, "Apagar"))
+                        if(Boton(250, 200, 70, 30, 22, "Apagar"))
                                    {
-                                       estado_actual=estado_anterior;
+                                       estado_actual=AbrirManana;
                                        alarma_manana=0;
                                        minutos_manana_ant=0;
+                                       FinNota();
 
                                    }
                         if(Boton(10, 200, 70, 30, 22, "Cancelar"))
                                    {
                                        estado_actual=estado_anterior;
+                                       alarma_manana=0;
+                                       minutos_manana_ant=0;
+                                       FinNota();
+                                       no_manana=1;
 
                                    }
 
@@ -1609,6 +1684,8 @@ int main(void) {
             Nueva_pantalla(0x10,0x10,0x10);
 
 
+                        VolNota(255);        // volumen
+                        TocaNota(S_BEEP, 50);
                         set_color_negro();
                         ComRect(0,0, HSIZE, VSIZE, true);
                         set_color_blanco();
@@ -1624,28 +1701,33 @@ int main(void) {
                             ComTXT(HSIZE/2, VSIZE/2, 28, OPT_CENTER, texto_hora_tarde);
                         }
 
-                        // ----- BotÃ³n Apagar -----
+                        // ----- Boton Apagar -----
                         ComColor(0,0,0);
                         ComFgcolor(0,255, 0);
-                        ComButton(280, 200, 70, 30, 22,OPT_CENTER, "Apagar");
+                        ComButton(250, 200, 70, 30, 22,OPT_CENTER, "Apagar");
 
-                        // ----- BotÃ³n Cancelar -----
+                        // ----- Boton Cancelar -----
                         ComColor(0,0,0);
                         ComFgcolor(255,0, 0);
                         ComButton(10, 200, 70, 30, 22,OPT_CENTER, "Cancelar");
 
                         Dibuja();
-                        if(Boton(280, 200, 70, 30, 22, "Apagar"))
+                        if(Boton(250, 200, 70, 30, 22, "Apagar"))
                                    {
-                                       estado_actual=estado_anterior;
+                                       estado_actual=AbrirTarde;
                                        alarma_tarde=0;
                                        minutos_tarde_ant=0;
+                                       FinNota();
 
 
                                    }
                         if(Boton(10, 200, 70, 30, 22, "Cancelar"))
                                    {
                                        estado_actual=estado_anterior;
+                                       alarma_tarde=0;
+                                       minutos_tarde_ant=0;
+                                       FinNota();
+                                       no_tarde=1;
 
                                    }
 
@@ -1656,6 +1738,8 @@ int main(void) {
             Nueva_pantalla(0x10,0x10,0x10);
 
 
+                        VolNota(255);        // volumen
+                        TocaNota(S_BEEP, 50);
                         set_color_negro();
                         ComRect(0,0, HSIZE, VSIZE, true);
                         set_color_blanco();
@@ -1671,23 +1755,24 @@ int main(void) {
                             ComTXT(HSIZE/2, VSIZE/2, 28, OPT_CENTER, texto_hora_noche);
                         }
 
-                        // ----- BotÃ³n Apagar -----
+                        // ----- Boton Apagar -----
                         ComColor(0,0,0);
                         ComFgcolor(0,255, 0);
-                        ComButton(280, 200, 70, 30, 22,OPT_CENTER, "Apagar");
+                        ComButton(250, 200, 70, 30, 22,OPT_CENTER, "Apagar");
 
-                        // ----- BotÃ³n Cancelar -----
+                        // ----- Boton Cancelar -----
                         ComColor(0,0,0);
                         ComFgcolor(255,0, 0);
                         ComButton(10, 200, 70, 30, 22,OPT_CENTER, "Cancelar");
 
                         Dibuja();
 
-                        if(Boton(280, 200, 70, 30, 22, "Apagar"))
+                        if(Boton(250, 200, 70, 30, 22, "Apagar"))
                                    {
-                                       estado_actual=estado_anterior;
+                                       estado_actual=AbrirNoche;
                                        alarma_noche=0;
                                        minutos_noche_ant=0;
+                                       FinNota();
 
 
                                    }
@@ -1696,6 +1781,8 @@ int main(void) {
                                        estado_actual=estado_anterior;
                                        alarma_noche=0;
                                        minutos_noche_ant=0;
+                                       FinNota();
+                                       no_noche=1;
 
                                    }
 
@@ -1724,9 +1811,7 @@ void IntTimer0(void)
                 horas++;
                 if (horas >= 24){
                     horas = 0;
-                    dias++;
-                    if (dias >= 7)
-                        dias=0;
+                    idx=(idx+1)%7;
                 }
             }
         }
