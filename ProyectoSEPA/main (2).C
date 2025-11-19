@@ -128,10 +128,15 @@ int h;//variable que registra el valor numerico de la hora introducida
 int m;//variable que registra el valor numerico del minuto introducido
 
 int dias,horas, minutos, segundos; //hora calculada por el micro
-int horas_manana=0, minutos_manana=0;//variables para modificar la hora en la que se ha tomado la primera pastilla
+int horas_manana=6, minutos_manana=0;//variables para modificar la hora en la que se ha tomado la primera pastilla
 int horas_tarde=12, minutos_tarde=0;//variables para modificar la hora en la que se ha tomado la segunda pastilla
-int minutos_tarde_ant=0, minutos_manana_ant=0, minutos_noche_ant=0;
 int horas_noche=18, minutos_noche=0;//variables para modificar la hora en la que se ha tomado la tercera pastilla
+
+int horas_manana_p=6, minutos_manana_p=0;//variables para modificar la hora en la que se ha tomado la primera pastilla al iniciar la interfaz
+int horas_tarde_p=12, minutos_tarde_p=0;//variables para modificar la hora en la que se ha tomado la segunda pastilla al iniciar la interfaz
+int horas_noche_p=18, minutos_noche_p=0;//variables para modificar la hora en la que se ha tomado la tercera pastilla al iniciar la interfaz
+
+int minutos_tarde_ant=0, minutos_manana_ant=0, minutos_noche_ant=0;
 int alarma_manana=7, alarma_tarde=15, alarma_noche=23;//Alarmas predeterminadas cada 8h--> a modificar por el usuario segun la pastilla que necesite
 char texto_hora_manana[10], texto_hora_tarde[10], texto_hora_noche[10];//variable para escribir la alarma predeterminada
 char buffer2[9]; //Variable que imprime la hora en la pantalla
@@ -139,8 +144,11 @@ int p; //Contador para contar segundos
 int espera; //contador para esperar que el usuario coja la pastilla
 int tiempo_inicio; //variable para controlar cuanto tiempo se mantiene el pastillero abierto
 int tiempo_mensaje;//variable para marcar cuando se envia un mensaje por whatsapp al familiar
+int infi=0; //variable que cuenta segundos y no se reinicia
+int cancel_m=0 , cancel_t=0 , cancel_n=0; //Variables que se ponen a 1 en caso de que se cancele la alarma
 
-int no_manana=0, no_tarde=0, no_noche=0; // variable que se pone a 1 si no se ha tomado la pastilla del dia
+int no_manana=1, no_tarde=1, no_noche=1; // variable que se pone a 1 si no se ha tomado la pastilla para la alarma
+int pastilla_m_no=0, pastilla_t_no=0,pastilla_n_no=0;// variable que se pone a 1 si no se ha tomado la pastilla para abrir la compuerta manualmente
 
 unsigned long REG_TT[6];
 const int32_t REG_CAL[6]= {CAL_DEFAULTS};
@@ -417,7 +425,7 @@ int main(void) {
             { // dia correcto
 
                 UARTprintf("Dia valido: %s\n", semana_completa[idx]);
-                UARTprintf("Introuzca la hora del dia (1-24):\n");
+                UARTprintf("Introuzca la hora del dia (0-23):\n");
                 estado_actual = Hora1;
             }
             else
@@ -479,7 +487,7 @@ int main(void) {
         case Verificacion_hora:
             h = atoi(hora); //se convierte texto a entero
 
-            if (h >= 1 && h <= 24)
+            if (h >= 0 && h <= 23)
             {
                 UARTprintf("Hora correcta: %d\n", h);
                 UARTprintf("Introducir minuto(0-59): \n");
@@ -545,13 +553,23 @@ int main(void) {
         case Verificacion_min:
             m = atoi(minuto); //se convierte texto a entero
 
-            if (m >= 0 && m <= 60)
+            if (m >= 0 && m <= 59)
             {
                 UARTprintf("Minuto correcto: %d\n", m);
                 minutos=m;
-                if(horas>=6 && horas<12)estado_actual = Reposo1;
-                if(horas>=12 && horas<=18)estado_actual = Reposo2;
-                if(horas>=18 && horas<=24)estado_actual = Reposo3;
+                if(horas>=6 && horas<12)
+                    {
+                        estado_actual = Reposo1;
+                    }
+                if(horas>=12 && horas<=18)
+                    {
+                        estado_actual = Reposo2;
+                    }
+                if(horas>=18 && horas<=24)
+                    {
+                        estado_actual = Reposo3;
+                    }
+
 
             }
             else
@@ -597,7 +615,7 @@ int main(void) {
                 r_manana=1;
                 g_manana=0;
                 b_manana=0;
-                no_manana=1;
+                pastilla_m_no=1;
 
             }
 
@@ -628,9 +646,9 @@ int main(void) {
             ComRect(80,140, 100, 160, true);
             ComRect(200,140, 220, 160, true);
             set_color_negro();
-            sprintf(buffer, "%02d", horas_manana);
+            sprintf(buffer, "%02d", horas_manana_p);
             ComTXT(90, 150, 28, OPT_CENTER, buffer);
-            sprintf(buffer, "%02d", minutos_manana);
+            sprintf(buffer, "%02d", minutos_manana_p);
             ComTXT(210, 150, 28, OPT_CENTER, buffer);
 
             // ----- Triangulos abajo -----
@@ -645,33 +663,33 @@ int main(void) {
             ComButton(280, 200, 30, 30, 22,OPT_CENTER, "OK");
 
             Dibuja();
-            horas_manana=6;
+
             if(Boton(75, 100, 30, 30, 22, "^"))//horas
             {
-                if (horas_manana < 12)
+                if (horas_manana_p < horas )
                 {
-                    horas_manana++;
+                    horas_manana_p++;
                 }
             }
             if(Boton(195, 100, 30, 30, 22, "^"))//minutos
             {
-                if (minutos_manana < 59)
+                if (minutos_manana_p < minutos)
                 {
-                    minutos_manana++;
+                    minutos_manana_p++;
                 }
             }
             if(Boton(75, 170, 30, 30, 22, "v"))//horas
             {
-                if (horas_manana >6)
+                if (horas_manana_p >6)
                 {
-                    horas_manana--;
+                    horas_manana_p--;
                 }
             }
             if(Boton(195, 170, 30, 30, 22,"v"))//minutos
             {
-                if (minutos_manana >0)
+                if (minutos_manana_p >0)
                 {
-                    minutos_manana--;
+                    minutos_manana_p--;
                 }
             }
             if(Boton(280, 200, 30, 30, 22, "OK"))
@@ -681,10 +699,11 @@ int main(void) {
                 r_manana=0;
                 g_manana=1;
                 b_manana=0;
-                alarma_tarde=horas_manana+8;
-                minutos_tarde_ant=minutos_manana;
-                alarma_noche=horas_manana+16;
-                minutos_noche_ant=minutos_manana;
+                alarma_tarde=horas_manana_p+6;
+                minutos_tarde_ant=minutos_manana_p;
+                alarma_noche=horas_manana_p+12;
+                minutos_noche_ant=minutos_manana_p;
+                no_manana=0;
             }
             break;
 
@@ -715,6 +734,7 @@ int main(void) {
             {
                 estado_actual=TardeOK;
 
+
             }
 
             if(Boton(170, 160, 40, 40, 22, "NO")) //Si aprieto boton NO
@@ -724,7 +744,7 @@ int main(void) {
                 r_tarde=1;
                 g_tarde=0;
                 b_tarde=0;
-                no_tarde=1;
+                pastilla_t_no=1;
 
             }
 
@@ -755,9 +775,9 @@ int main(void) {
             ComRect(80,140, 100, 160, true);
             ComRect(200,140, 220, 160, true);
             set_color_negro();
-            sprintf(buffer, "%02d", horas_tarde);
+            sprintf(buffer, "%02d", horas_tarde_p);
             ComTXT(90, 150, 28, OPT_CENTER, buffer);
-            sprintf(buffer, "%02d", minutos_tarde);
+            sprintf(buffer, "%02d", minutos_tarde_p);
             ComTXT(210, 150, 28, OPT_CENTER, buffer);
 
             // ----- Triangulos abajo -----
@@ -775,30 +795,30 @@ int main(void) {
 
             if(Boton(75, 100, 30, 30, 22, "^"))//horas
             {
-                if (horas_tarde < 18)
+                if (horas_tarde_p < horas)
                 {
-                    horas_tarde++;
+                    horas_tarde_p++;
                 }
             }
             if(Boton(195, 100, 30, 30, 22, "^"))//minutos
             {
-                if (minutos_tarde < 59)
+                if (minutos_tarde_p < minutos)
                 {
-                    minutos_tarde++;
+                    minutos_tarde_p++;
                 }
             }
             if(Boton(75, 170, 30, 30, 22, "v"))//horas
             {
-                if (horas_tarde >12)
+                if (horas_tarde_p >12)
                 {
-                    horas_tarde--;
+                    horas_tarde_p--;
                 }
             }
             if(Boton(195, 170, 30, 30, 22,"v"))//minutos
             {
-                if (minutos_tarde >0)
+                if (minutos_tarde_p >0)
                 {
-                    minutos_tarde--;
+                    minutos_tarde_p--;
                 }
             }
             if(Boton(280, 200, 30, 30, 22, "OK"))
@@ -807,8 +827,9 @@ int main(void) {
                 r_tarde=0;
                 g_tarde=1;
                 b_tarde=0;
-                alarma_noche=horas_tarde+8;
-                minutos_noche_ant=minutos_tarde;
+                alarma_noche=horas_tarde_p+6;
+                minutos_noche_ant=minutos_tarde_p;
+                no_tarde=0;
 
             }
             break;
@@ -830,9 +851,9 @@ int main(void) {
             //BOTONES
             ComColor(0,0,0);
             ComFgcolor(0,255, 0);
-            ComButton(65, 160, 40, 40, 22,OPT_FLAT, "SI");//boton SI
+            ComButton(105, 160, 40, 40, 22,OPT_FLAT, "SI");//boton SI
             ComFgcolor(255,0, 0);
-            ComButton(170, 160, 40, 40, 22,OPT_FLAT, "NO");//boton NO
+            ComButton(210, 160, 40, 40, 22,OPT_FLAT, "NO");//boton NO
 
             Dibuja();
 
@@ -849,7 +870,7 @@ int main(void) {
                 r_noche=1;
                 g_noche=0;
                 b_noche=0;
-                no_noche=1;
+                pastilla_n_no=1;
                 tiempo_mensaje=0;//comienza tiempo antes de enviar mensaje
             }
 
@@ -880,9 +901,9 @@ int main(void) {
             ComRect(80,140, 100, 160, true);
             ComRect(200,140, 220, 160, true);
             set_color_negro();
-            sprintf(buffer, "%02d", horas_noche);
+            sprintf(buffer, "%02d", horas_noche_p);
             ComTXT(90, 150, 28, OPT_CENTER, buffer);
-            sprintf(buffer, "%02d", minutos_noche);
+            sprintf(buffer, "%02d", minutos_noche_p);
             ComTXT(210, 150, 28, OPT_CENTER, buffer);
 
             // ----- Triangulos abajo -----
@@ -900,30 +921,30 @@ int main(void) {
 
             if(Boton(75, 100, 30, 30, 22, "^"))//horas
             {
-                if (horas_noche <= 23)
+                if (horas_noche_p < horas)
                 {
-                    horas_noche++;
+                    horas_noche_p++;
                 }
             }
             if(Boton(195, 100, 30, 30, 22, "^"))//minutos
             {
-                if (minutos_noche < 59)
+                if (minutos_noche_p < minutos)
                 {
-                    minutos_noche++;
+                    minutos_noche_p++;
                 }
             }
             if(Boton(75, 170, 30, 30, 22, "v"))//horas
             {
-                if (horas_noche >18)
+                if (horas_noche_p >18)
                 {
-                    horas_noche--;
+                    horas_noche_p--;
                 }
             }
             if(Boton(195, 170, 30, 30, 22,"v"))//minutos
             {
-                if (minutos_noche >0)
+                if (minutos_noche_p >0)
                 {
-                    minutos_noche--;
+                    minutos_noche_p--;
                 }
             }
             if(Boton(280, 200, 30, 30, 22, "OK"))
@@ -932,6 +953,7 @@ int main(void) {
                 r_noche=0;
                 g_noche=1;
                 b_noche=0;
+                no_noche=0;
             }
             break;
 
@@ -972,48 +994,58 @@ int main(void) {
             Dibuja();
             estado_anterior=estado_actual;
 
-            if(horas>=2 && horas<=3){//Se reinicia todo a las 2 de la manana
-                r_manana=255;
-                g_manana=255;
-                b_manana=255;
+          if(horas>=1 && horas<=2){//Se reinicia todo a la 12 de la noche
 
-                r_tarde=255;
-                g_tarde=255;
-                b_tarde=255;
+                no_manana=1;
+                r_manana=1;
+                g_manana=1;
+                b_manana=1;
 
-                r_noche=255;
-                g_noche=255;
-                b_noche=255;
+                no_tarde=1;
+                r_tarde=1;
+                g_tarde=1;
+                b_tarde=1;
+
+                no_noche=1;
+                r_noche=1;
+                g_noche=1;
+                b_noche=1;
+
+                pastilla_m_no=0;
+                pastilla_t_no=0;
+                pastilla_n_no=0;
 
             }
 
-            if((no_manana==1 || no_tarde==1 || no_noche==1) && segundos>30)//Se envia mensaje por whatsapp a adulto
+            if(cancel_m==1 && segundos>10)ESP1_ON;//Se envia mensaje por whatsapp a adulto*/
+            if(cancel_t==1 && segundos>10)ESP2_ON;//Se envia mensaje por whatsapp a adulto*/
+            if(cancel_n==1 && segundos>10)ESP3_ON;//Se envia mensaje por whatsapp a adulto*/
 
-                if(Boton(20, 140, 80, 80,28, "M")) //Si aprieto boton M
+                if(Boton(20, 140, 80, 80,22, "M")) //Si aprieto boton M
                 {
                     estado_actual=Manana;
 
                 }
-                if(Boton(116, 140, 80, 80,28, "T")) //Si aprieto boton T
+                if(Boton(116, 140, 80, 80,22, "T")) //Si aprieto boton T
                 {
                     estado_actual=Tarde;
 
                 }
-                if(Boton(212, 140, 80, 80,28, "N")) //Si aprieto boton N
+                if(Boton(212, 140, 80, 80,22, "N")) //Si aprieto boton N
                 {
                     estado_actual=Noche;
 
                 }
 
-            if(horas==alarma_manana && minutos==minutos_manana_ant)//Si se cumple el tiempo de la alarma de la manana
+            if(horas==alarma_manana && minutos==minutos_manana_ant && no_manana==1)//Si se cumple el tiempo de la alarma de la manana
             {
                 estado_actual=AlarmaManana;
             }
-            if(horas==alarma_tarde && minutos==minutos_tarde_ant)//Si se cumple el tiempo de la alarma de la tarde
+            if(horas==alarma_tarde && minutos==minutos_tarde_ant && no_tarde==1)//Si se cumple el tiempo de la alarma de la tarde
             {
                 estado_actual=AlarmaTarde;
             }
-            if(horas==alarma_noche && minutos==minutos_noche_ant)//Si se cumple el tiempo de la alarma de la noche
+            if(horas==alarma_noche && minutos==minutos_noche_ant && no_noche==1)//Si se cumple el tiempo de la alarma de la noche
             {
                 estado_actual=AlarmaNoche;
             }
@@ -1038,7 +1070,7 @@ int main(void) {
             ComButton(20,20,100,30,22,OPT_FLAT,texto_hora_manana);
 
             ComFgcolor(170,170, 170);
-            if(no_manana==1) ComFgcolor(0,255, 0);
+            if(pastilla_m_no==1 || cancel_m==1) ComFgcolor(0,255, 0);
             ComButton(20,70,100,30,22,OPT_FLAT,"ABRIR");
 
             // ----- Boton CANCEL -----
@@ -1048,11 +1080,17 @@ int main(void) {
 
             Dibuja();
             estado_anterior=estado_actual;
+            if(cancel_m==1 && segundos>10)ESP1_ON;//Se envia mensaje por whatsapp a adulto*/
+            if(cancel_t==1 && segundos>10)ESP2_ON;//Se envia mensaje por whatsapp a adulto*/
+            if(cancel_n==1 && segundos>10)ESP3_ON;//Se envia mensaje por whatsapp a adulto*/
 
-            if(Boton(20,70,100,30,22,"ABRIR") && no_manana==1)
+            if(Boton(20,70,100,30,22,"ABRIR") && (pastilla_m_no==1 || cancel_m==1))
             {
                 estado_actual=AbrirManana;
-                tiempo_inicio=segundos;
+                tiempo_inicio=infi;
+                cancel_m=0;
+                pastilla_m_no=0;
+                ESP1_OFF;
             }
             if(Boton(20,20,100,30,22,texto_hora_manana))
             {
@@ -1063,18 +1101,18 @@ int main(void) {
                 estado_actual=Inicio_i;
             }
 
-            if((no_manana==1 || no_tarde==1 || no_noche==1) && segundos>30)//Se envia mensaje por whatsapp a adulto
 
 
-                if(horas==alarma_manana && minutos==minutos_manana_ant)//Si se cumple el tiempo de la alarma de la manana
+
+                if(horas==alarma_manana && minutos==minutos_manana_ant && no_manana==1)//Si se cumple el tiempo de la alarma de la manana
                 {
                     estado_actual=AlarmaManana;
                 }
-                if(horas==alarma_tarde && minutos==minutos_tarde_ant)//Si se cumple el tiempo de la alarma de la tarde
+                if(horas==alarma_tarde && minutos==minutos_tarde_ant && no_tarde==1)//Si se cumple el tiempo de la alarma de la tarde
                 {
                     estado_actual=AlarmaTarde;
                 }
-                if(horas==alarma_noche && minutos==minutos_noche_ant)//Si se cumple el tiempo de la alarma de la noche
+                if(horas==alarma_noche && minutos==minutos_noche_ant && no_noche==1)//Si se cumple el tiempo de la alarma de la noche
                 {
                     estado_actual=AlarmaNoche;
                 }
@@ -1133,6 +1171,9 @@ int main(void) {
 
             Dibuja();
             estado_anterior=estado_actual;
+            if(cancel_m==1 && segundos>10)ESP1_ON;//Se envia mensaje por whatsapp a adulto*/
+            if(cancel_t==1 && segundos>10)ESP2_ON;//Se envia mensaje por whatsapp a adulto*/
+            if(cancel_n==1 && segundos>10)ESP3_ON;//Se envia mensaje por whatsapp a adulto*/
 
             if(Boton(75, 100, 30, 30, 22, "^"))//horas
             {
@@ -1180,21 +1221,19 @@ int main(void) {
                 minutos_manana=minutos_manana_ant;
             }
 
-            if((no_manana==1 || no_tarde==1 || no_noche==1) && segundos>30)//Se envia mensaje por whatsapp a adulto
 
-
-                if(horas==alarma_manana && minutos==minutos_manana_ant)//Si se cumple el tiempo de la alarma de la manana
-                {
-                    estado_actual=AlarmaManana;
-                }
-                if(horas==alarma_tarde && minutos==minutos_tarde_ant)//Si se cumple el tiempo de la alarma de la tarde
-                {
-                    estado_actual=AlarmaTarde;
-                }
-                if(horas==alarma_noche && minutos==minutos_noche_ant)//Si se cumple el tiempo de la alarma de la noche
-                {
-                    estado_actual=AlarmaNoche;
-                }
+        if(horas==alarma_manana && minutos==minutos_manana_ant && no_manana==1)//Si se cumple el tiempo de la alarma de la manana
+        {
+            estado_actual=AlarmaManana;
+        }
+        if(horas==alarma_tarde && minutos==minutos_tarde_ant && no_tarde==1)//Si se cumple el tiempo de la alarma de la tarde
+        {
+            estado_actual=AlarmaTarde;
+        }
+        if(horas==alarma_noche && minutos==minutos_noche_ant && no_noche==1)//Si se cumple el tiempo de la alarma de la noche
+        {
+            estado_actual=AlarmaNoche;
+        }
 
             break;
 
@@ -1214,10 +1253,10 @@ int main(void) {
 
             Dibuja();
 
-            posicion=3233;
+            posicion=Max_pos;
             PWMPulseWidthSet(PWM0_BASE, PWM_OUT_1, posicion);
 
-            if ((segundos - tiempo_inicio) >= 5) {  // han pasado 5 s
+            if ((infi - tiempo_inicio) >= 5) {  // han pasado 5 s
                 estado_actual = Manana;
                 posicion=Min_pos;
                 PWMPulseWidthSet(PWM0_BASE, PWM_OUT_1, posicion);
@@ -1243,7 +1282,7 @@ int main(void) {
             ComButton(20,20,100,30,22,OPT_FLAT,texto_hora_tarde);
 
             ComFgcolor(170,170, 170);
-            if(no_tarde==1) ComFgcolor(0,255, 0);
+            if(pastilla_t_no==1 || cancel_t==1) ComFgcolor(0,255, 0);
             ComButton(20,70,100,30,22,OPT_FLAT,"ABRIR");
 
             // ----- Boton CANCEL -----
@@ -1254,10 +1293,17 @@ int main(void) {
             Dibuja();
 
             estado_anterior=estado_actual;
-            if(Boton(20,70,100,30,22,"ABRIR") && no_tarde==1)
+            if(cancel_m==1 && segundos>10)ESP1_ON;//Se envia mensaje por whatsapp a adulto*/
+            if(cancel_t==1 && segundos>10)ESP2_ON;//Se envia mensaje por whatsapp a adulto*/
+            if(cancel_n==1 && segundos>10)ESP3_ON;//Se envia mensaje por whatsapp a adulto*/
+
+            if(Boton(20,70,100,30,22,"ABRIR") && (pastilla_t_no==1|| cancel_t==1))
             {
                 estado_actual=AbrirTarde;
-                tiempo_inicio=segundos;
+                tiempo_inicio=infi;
+                cancel_t=0;
+                pastilla_t_no=0;
+                ESP2_OFF;
             }
             if(Boton(20,20,100,30,22,texto_hora_tarde))
             {
@@ -1268,19 +1314,16 @@ int main(void) {
                 estado_actual=Inicio_i;
             }
 
-            if((no_manana==1 || no_tarde==1 || no_noche==1) && segundos>30)//Se envia mensaje por whatsapp a adulto
 
-
-                if(horas==alarma_manana && minutos==minutos_manana_ant)//Si se cumple el tiempo de la alarma de la manana
+                if(horas==alarma_manana && minutos==minutos_manana_ant && no_manana==1)//Si se cumple el tiempo de la alarma de la manana
                 {
-
                     estado_actual=AlarmaManana;
                 }
-                if(horas==alarma_tarde && minutos==minutos_tarde_ant)//Si se cumple el tiempo de la alarma de la tarde
+                if(horas==alarma_tarde && minutos==minutos_tarde_ant && no_tarde==1)//Si se cumple el tiempo de la alarma de la tarde
                 {
                     estado_actual=AlarmaTarde;
                 }
-                if(horas==alarma_noche && minutos==minutos_noche_ant)//Si se cumple el tiempo de la alarma de la noche
+                if(horas==alarma_noche && minutos==minutos_noche_ant && no_noche==1)//Si se cumple el tiempo de la alarma de la noche
                 {
                     estado_actual=AlarmaNoche;
                 }
@@ -1339,6 +1382,10 @@ int main(void) {
 
             Dibuja();
 
+            if(cancel_m==1 && segundos>10)ESP1_ON;//Se envia mensaje por whatsapp a adulto*/
+            if(cancel_t==1 && segundos>10)ESP2_ON;//Se envia mensaje por whatsapp a adulto*/
+            if(cancel_n==1 && segundos>10)ESP3_ON;//Se envia mensaje por whatsapp a adulto*/
+
             if(Boton(75, 100, 30, 30, 22, "^"))//horas
             {
                 if (horas_tarde < 18)
@@ -1362,7 +1409,7 @@ int main(void) {
             }
             if(Boton(195, 170, 30, 30, 22,"v"))//minutos
             {
-                if (minutos_tarde >1)
+                if (minutos_tarde >0)
                 {
                     minutos_tarde--;
                 }
@@ -1381,18 +1428,16 @@ int main(void) {
             }
 
             estado_anterior=estado_actual;
-            if((no_manana==1 || no_tarde==1 || no_noche==1) && segundos>30)//Se envia mensaje por whatsapp a adulto
 
-
-                if(horas==alarma_manana && minutos==minutos_manana_ant)//Si se cumple el tiempo de la alarma de la manana
+                if(horas==alarma_manana && minutos==minutos_manana_ant && no_manana==1)//Si se cumple el tiempo de la alarma de la manana
                 {
                     estado_actual=AlarmaManana;
                 }
-                if(horas==alarma_tarde && minutos==minutos_tarde_ant)//Si se cumple el tiempo de la alarma de la tarde
+                if(horas==alarma_tarde && minutos==minutos_tarde_ant && no_tarde==1)//Si se cumple el tiempo de la alarma de la tarde
                 {
                     estado_actual=AlarmaTarde;
                 }
-                if(horas==alarma_noche && minutos==minutos_noche_ant)//Si se cumple el tiempo de la alarma de la noche
+                if(horas==alarma_noche && minutos==minutos_noche_ant && no_noche==1)//Si se cumple el tiempo de la alarma de la noche
                 {
                     estado_actual=AlarmaNoche;
                 }
@@ -1415,10 +1460,10 @@ int main(void) {
 
             Dibuja();
 
-            posicion=3233;
+            posicion=Max_pos;
             PWMPulseWidthSet(PWM0_BASE, PWM_OUT_4, posicion);
 
-            if ((segundos - tiempo_inicio) >= 5) {  // han pasado 3 s
+            if ((infi - tiempo_inicio) >= 5) {  // han pasado 3 s
                 estado_actual = Tarde;
                 posicion=Min_pos;
                 PWMPulseWidthSet(PWM0_BASE, PWM_OUT_4, posicion);
@@ -1444,7 +1489,7 @@ int main(void) {
             ComButton(20,20,100,30,22,OPT_FLAT,texto_hora_noche);
 
             ComFgcolor(170,170, 170);
-            if(no_noche==1) ComFgcolor(0,255, 0);
+            if(pastilla_n_no==1 || cancel_n==1) ComFgcolor(0,255, 0);
             ComButton(20,70,100,30,22,OPT_FLAT,"ABRIR");
 
             // ----- Boton CANCEL -----
@@ -1455,10 +1500,17 @@ int main(void) {
             Dibuja();
             estado_anterior=estado_actual;
 
-            if(Boton(20,70,100,30,22,"ABRIR") && no_noche==1)
+            if(cancel_m==1 && segundos>10)ESP1_ON;//Se envia mensaje por whatsapp a adulto*/
+            if(cancel_t==1 && segundos>10)ESP2_ON;//Se envia mensaje por whatsapp a adulto*/
+            if(cancel_n==1 && segundos>10)ESP3_ON;//Se envia mensaje por whatsapp a adulto*/
+
+            if(Boton(20,70,100,30,22,"ABRIR") && (pastilla_n_no==1 || cancel_n==1))
             {
                 estado_actual=AbrirNoche;
-                tiempo_inicio=segundos;
+                tiempo_inicio=infi;
+                cancel_n=0;
+                pastilla_n_no=0;
+                ESP3_OFF;
             }
             if(Boton(20,20,100,30,22,texto_hora_noche))
             {
@@ -1469,21 +1521,18 @@ int main(void) {
                 estado_actual=Inicio_i;
             }
 
-            if((no_manana==1 || no_tarde==1 || no_noche==1) && segundos>30)//Se envia mensaje por whatsapp a adulto
-
-
-                if(horas==alarma_manana && minutos==minutos_manana_ant)//Si se cumple el tiempo de la alarma de la manana
-                {
-                    estado_actual=AlarmaManana;
-                }
-                if(horas==alarma_tarde && minutos==minutos_tarde_ant)//Si se cumple el tiempo de la alarma de la tarde
-                {
-                    estado_actual=AlarmaTarde;
-                }
-                if(horas==alarma_noche && minutos==minutos_noche_ant)//Si se cumple el tiempo de la alarma de la noche
-                {
-                    estado_actual=AlarmaNoche;
-                }
+            if(horas==alarma_manana && minutos==minutos_manana_ant && no_manana==1)//Si se cumple el tiempo de la alarma de la manana
+            {
+                estado_actual=AlarmaManana;
+            }
+            if(horas==alarma_tarde && minutos==minutos_tarde_ant && no_tarde==1)//Si se cumple el tiempo de la alarma de la tarde
+            {
+                estado_actual=AlarmaTarde;
+            }
+            if(horas==alarma_noche && minutos==minutos_noche_ant && no_noche==1)//Si se cumple el tiempo de la alarma de la noche
+            {
+                estado_actual=AlarmaNoche;
+            }
 
 
 
@@ -1539,9 +1588,13 @@ int main(void) {
 
             Dibuja();
 
+            if(cancel_m==1 && segundos>10)ESP1_ON;//Se envia mensaje por whatsapp a adulto*/
+            if(cancel_t==1 && segundos>10)ESP2_ON;//Se envia mensaje por whatsapp a adulto*/
+            if(cancel_n==1 && segundos>10)ESP3_ON;//Se envia mensaje por whatsapp a adulto*/
+
             if(Boton(75, 100, 30, 30, 22, "^"))//horas
             {
-                if (horas_noche <= 23)
+                if (horas_noche < 23)
                 {
                     horas_noche++;
                 }
@@ -1562,7 +1615,7 @@ int main(void) {
             }
             if(Boton(195, 170, 30, 30, 22,"v"))//minutos
             {
-                if (minutos_noche >1)
+                if (minutos_noche >0)
                 {
                     minutos_noche--;
                 }
@@ -1581,21 +1634,18 @@ int main(void) {
             }
 
             estado_anterior=estado_actual;
-            if((no_manana==1 || no_tarde==1 || no_noche==1) && segundos>30)//Se envia mensaje por whatsapp a adulto
-
-
-                if(horas==alarma_manana && minutos==minutos_manana_ant)//Si se cumple el tiempo de la alarma de la manana
-                {
-                    estado_actual=AlarmaManana;
-                }
-                if(horas==alarma_tarde && minutos==minutos_tarde_ant)//Si se cumple el tiempo de la alarma de la tarde
-                {
-                    estado_actual=AlarmaTarde;
-                }
-                if(horas==alarma_noche && minutos==minutos_noche_ant)//Si se cumple el tiempo de la alarma de la noche
-                {
-                    estado_actual=AlarmaNoche;
-                }
+            if(horas==alarma_manana && minutos==minutos_manana_ant && no_manana==1)//Si se cumple el tiempo de la alarma de la manana
+            {
+                estado_actual=AlarmaManana;
+            }
+            if(horas==alarma_tarde && minutos==minutos_tarde_ant && no_tarde==1)//Si se cumple el tiempo de la alarma de la tarde
+            {
+                estado_actual=AlarmaTarde;
+            }
+            if(horas==alarma_noche && minutos==minutos_noche_ant && no_noche==1)//Si se cumple el tiempo de la alarma de la noche
+            {
+                estado_actual=AlarmaNoche;
+            }
             break;
 
         case AbrirNoche:
@@ -1614,10 +1664,10 @@ int main(void) {
 
             Dibuja();
 
-            posicion=3233;
+            posicion=Max_pos;
             PWMPulseWidthSet(PWM0_BASE, PWM_OUT_3, posicion);
 
-            if ((segundos - tiempo_inicio) >= 5) {  // han pasado 3 s
+            if ((infi - tiempo_inicio) >= 5) {  // han pasado 3 s
                 estado_actual = Noche;
                 posicion=Min_pos;
                 PWMPulseWidthSet(PWM0_BASE, PWM_OUT_3, posicion);
@@ -1634,18 +1684,19 @@ int main(void) {
 
                         VolNota(255);        // volumen
                         TocaNota(S_BEEP, 50);
+                        sprintf(buffer, "%02d:%02d", horas, minutos);
                         set_color_negro();
                         set_color_blanco();
                         ComTXT(HSIZE/2, VSIZE/3, 28, OPT_CENTER, "ALARMA MANANA");
                         if(parp==1)
                         {
                             set_color_blanco();
-                            ComTXT(HSIZE/2, VSIZE/2, 28, OPT_CENTER, texto_hora_manana);
+                            ComTXT(HSIZE/2, VSIZE/2, 28, OPT_CENTER, buffer);
                         }
                         else
                         {
                             set_color_negro();
-                            ComTXT(HSIZE/2, VSIZE/2, 28, OPT_CENTER, texto_hora_manana);
+                            ComTXT(HSIZE/2, VSIZE/2, 28, OPT_CENTER, buffer);
                         }
 
                         // ----- Boton Apagar -----
@@ -1662,7 +1713,8 @@ int main(void) {
                         if(Boton(250, 200, 70, 30, 22, "Apagar"))
                                    {
                                        estado_actual=AbrirManana;
-                                       alarma_manana=0;
+                                       horas_manana=0;
+                                       no_manana=0;
                                        minutos_manana_ant=0;
                                        FinNota();
 
@@ -1670,10 +1722,15 @@ int main(void) {
                         if(Boton(10, 200, 70, 30, 22, "Cancelar"))
                                    {
                                        estado_actual=estado_anterior;
-                                       alarma_manana=0;
+                                       horas_manana=0;
                                        minutos_manana_ant=0;
+                                       r_manana=1;
+                                       g_manana=0;
+                                       b_manana=0;
                                        FinNota();
-                                       no_manana=1;
+                                       no_manana=0;
+                                       cancel_m=1;
+                                       tiempo_mensaje=infi;
 
                                    }
 
@@ -1686,6 +1743,7 @@ int main(void) {
 
                         VolNota(255);        // volumen
                         TocaNota(S_BEEP, 50);
+                        sprintf(buffer, "%02d:%02d", horas, minutos);
                         set_color_negro();
                         ComRect(0,0, HSIZE, VSIZE, true);
                         set_color_blanco();
@@ -1693,12 +1751,12 @@ int main(void) {
                         if(parp==1)
                         {
                             set_color_blanco();
-                            ComTXT(HSIZE/2, VSIZE/2, 28, OPT_CENTER, texto_hora_tarde);
+                            ComTXT(HSIZE/2, VSIZE/2, 28, OPT_CENTER, buffer);
                         }
                         else
                         {
                             set_color_negro();
-                            ComTXT(HSIZE/2, VSIZE/2, 28, OPT_CENTER, texto_hora_tarde);
+                            ComTXT(HSIZE/2, VSIZE/2, 28, OPT_CENTER, buffer);
                         }
 
                         // ----- Boton Apagar -----
@@ -1715,7 +1773,8 @@ int main(void) {
                         if(Boton(250, 200, 70, 30, 22, "Apagar"))
                                    {
                                        estado_actual=AbrirTarde;
-                                       alarma_tarde=0;
+                                       horas_tarde=0;
+                                       no_tarde=0;
                                        minutos_tarde_ant=0;
                                        FinNota();
 
@@ -1724,10 +1783,15 @@ int main(void) {
                         if(Boton(10, 200, 70, 30, 22, "Cancelar"))
                                    {
                                        estado_actual=estado_anterior;
-                                       alarma_tarde=0;
+                                       horas_tarde=0;
                                        minutos_tarde_ant=0;
+                                       r_tarde=1;
+                                       g_tarde=0;
+                                       b_tarde=0;
                                        FinNota();
-                                       no_tarde=1;
+                                       no_tarde=0;
+                                       cancel_t=1;
+                                       tiempo_mensaje=infi;
 
                                    }
 
@@ -1740,6 +1804,7 @@ int main(void) {
 
                         VolNota(255);        // volumen
                         TocaNota(S_BEEP, 50);
+                        sprintf(buffer, "%02d:%02d", horas, minutos);
                         set_color_negro();
                         ComRect(0,0, HSIZE, VSIZE, true);
                         set_color_blanco();
@@ -1747,12 +1812,12 @@ int main(void) {
                         if(parp==1)
                         {
                             set_color_blanco();
-                            ComTXT(HSIZE/2, VSIZE/2, 28, OPT_CENTER, texto_hora_noche);
+                            ComTXT(HSIZE/2, VSIZE/2, 28, OPT_CENTER, buffer);
                         }
                         else
                         {
                             set_color_negro();
-                            ComTXT(HSIZE/2, VSIZE/2, 28, OPT_CENTER, texto_hora_noche);
+                            ComTXT(HSIZE/2, VSIZE/2, 28, OPT_CENTER, buffer);
                         }
 
                         // ----- Boton Apagar -----
@@ -1770,8 +1835,9 @@ int main(void) {
                         if(Boton(250, 200, 70, 30, 22, "Apagar"))
                                    {
                                        estado_actual=AbrirNoche;
-                                       alarma_noche=0;
+                                       horas_noche=0;
                                        minutos_noche_ant=0;
+                                       no_noche=0;
                                        FinNota();
 
 
@@ -1779,10 +1845,15 @@ int main(void) {
                         if(Boton(10, 200, 70, 30, 22, "Cancelar"))
                                    {
                                        estado_actual=estado_anterior;
-                                       alarma_noche=0;
+                                       horas_noche=0;
                                        minutos_noche_ant=0;
+                                       r_noche=1;
+                                       g_noche=0;
+                                       b_noche=0;
                                        FinNota();
-                                       no_noche=1;
+                                       no_noche=0;
+                                       cancel_n=1;
+                                       tiempo_mensaje=infi;
 
                                    }
 
@@ -1802,6 +1873,7 @@ void IntTimer0(void)
     if (p >= 50) {
         p = 0;
         segundos++;
+        infi++;
 
         if (segundos >= 60) {
             segundos = 0;
@@ -1809,7 +1881,7 @@ void IntTimer0(void)
             if (minutos >= 60) {
                 minutos = 0;
                 horas++;
-                if (horas >= 24){
+                if (horas >= 23){
                     horas = 0;
                     idx=(idx+1)%7;
                 }
