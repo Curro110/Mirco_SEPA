@@ -561,6 +561,11 @@ int main(void)
             {
                 UARTprintf("Minuto correcto: %d\n", m);
                 minutos = m;
+                if (horas >= 0  && horas < 6)
+                {
+                    estado_actual = Inicio_i;
+                }
+
                 if (horas >= 6 && horas < 12)
                 {
                     estado_actual = Reposo1;
@@ -573,6 +578,7 @@ int main(void)
                 {
                     estado_actual = Reposo3;
                 }
+
             }
             else
             {
