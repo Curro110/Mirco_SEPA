@@ -83,8 +83,8 @@ enum estados
     NocheOK, // Se ha tomado la tercera pastilla del dia
     NocheNO, // No se ha tomado la tercera pastilla del dia
 
-    Inicio_i, // Pantalla de inicio
-
+    Inicio_i,    // Pantalla de inicio
+    Recarga,     // Estado de Recarga
     Manana,      // Pantalla para abrir manualmente el pastillero o poner alarma de la mañana
     ConfigHora1, // Pantalla para configurar la alarma de mañana
     AbrirManana, // Abrir pastillero de manera manual en caso de que no se haya tomado la pastilla
@@ -1035,6 +1035,70 @@ int main(void)
             if (horas == alarma_noche && minutos == minutos_noche_ant && no_noche == 1) // Si se cumple el tiempo de la alarma de la noche
             {
                 estado_actual = AlarmaNoche;
+            }
+            if (UARTCharsAvail(UART0_BASE))
+            {
+                c = UARTCharGetNonBlocking(UART0_BASE);
+
+                // --- NUEVO: detección tecla 'R' ---
+                if (c == 'R' || c == 'r')
+                {
+                    UARTprintf("\n--> MODO RECARGA ACTIVADO <--\n");
+                    estado_actual = Recarga;
+                }
+            }
+            break;
+            // estado de recarga de pastillas //
+        case Recarga:
+            Nueva_pantalla(0x10, 0x10, 0x10);
+
+            // FONDO
+            set_color_azul();
+            ComRect(0, 0, HSIZE, VSIZE, true);
+            set_color_blanco();
+            ComTXT(HSIZE / 2, VSIZE / 2, 26, OPT_CENTER, "Recarga de Pastillas,  Pulse F para finalizar la recarga");
+
+            Dibuja();
+            estado_anterior = estado_actual;
+
+            posicion = Max_pos;
+            PWMPulseWidthSet(PWM0_BASE, PWM_OUT_1, posicion);
+            PWMPulseWidthSet(PWM0_BASE, PWM_OUT_2, posicion);
+            PWMPulseWidthSet(PWM0_BASE, PWM_OUT_3, posicion);
+            if (UARTCharsAvail(UART0_BASE))
+            {
+                c = UARTCharGetNonBlocking(UART0_BASE);
+
+                // --- NUEVO: detección tecla 'R' ---
+                if (c == 'F' || c == 'f')
+                {
+                    UARTprintf("\n--> MODO RECARGA FINALIZADO <--\n");
+                    posicion = Min_pos;
+                    PWMPulseWidthSet(PWM0_BASE, PWM_OUT_1, posicion);
+                    PWMPulseWidthSet(PWM0_BASE, PWM_OUT_2, posicion);
+                    PWMPulseWidthSet(PWM0_BASE, PWM_OUT_3, posicion);
+
+                    no_manana = 1;
+                    r_manana = 1;
+                    g_manana = 1;
+                    b_manana = 1;
+
+                    no_tarde = 1;
+                    r_tarde = 1;
+                    g_tarde = 1;
+                    b_tarde = 1;
+
+                    no_noche = 1;
+                    r_noche = 1;
+                    g_noche = 1;
+                    b_noche = 1;
+
+                    pastilla_m_no = 0;
+                    pastilla_t_no = 0;
+                    pastilla_n_no = 0;
+
+                    estado_actual = Inicio_i;
+                }
             }
 
             break;
