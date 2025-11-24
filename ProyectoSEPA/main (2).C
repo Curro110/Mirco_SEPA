@@ -83,8 +83,9 @@ enum estados
     NocheOK, // Se ha tomado la tercera pastilla del dia
     NocheNO, // No se ha tomado la tercera pastilla del dia
 
-    Inicio_i,    // Pantalla de inicio
-    Recarga,     // Estado de Recarga
+    Inicio_i, // Pantalla de inicio
+    Recarga, // Estado de Recarga
+    Fin_recarga,
     Manana,      // Pantalla para abrir manualmente el pastillero o poner alarma de la mañana
     ConfigHora1, // Pantalla para configurar la alarma de mañana
     AbrirManana, // Abrir pastillero de manera manual en caso de que no se haya tomado la pastilla
@@ -112,7 +113,7 @@ char dia[4];     // variable donde se registra el dia por el usuario
 char hora[3];    // variable donde se registra la hora por el usuario
 char minuto[3];  // variable donde se registra el minuto por el usuario
 char buffer[10]; // Variable para guardar la hora en el que el usuario se ha tomado una pastilla
-
+char reload;
 char c; // variable que registra lo que guarda el usuario
 int h;  // variable que registra el valor numerico de la hora introducida
 int m;  // variable que registra el valor numerico del minuto introducido
@@ -139,7 +140,7 @@ int cancel_m = 0, cancel_t = 0, cancel_n = 0;                           // Varia
 
 int no_manana = 1, no_tarde = 1, no_noche = 1;               // variable que se pone a 1 si no se ha tomado la pastilla para la alarma
 int pastilla_m_no = 0, pastilla_t_no = 0, pastilla_n_no = 0; // variable que se pone a 1 si no se ha tomado la pastilla para abrir la compuerta manualmente
-
+int ultimapastilla =0 ;// variable para saber que se ha tomado la ultima pastilla y recargar se pone a 1 cuando se ha tomado la ultima pastilla y a 0 cuando entre en recarga
 unsigned long REG_TT[6];
 const int32_t REG_CAL[6] = {CAL_DEFAULTS};
 
@@ -944,6 +945,7 @@ int main(void)
                 g_noche = 1;
                 b_noche = 0;
                 no_noche = 0;
+                ultimapastilla=1;
             }
             break;
 
@@ -981,27 +983,25 @@ int main(void)
             Dibuja();
             estado_anterior = estado_actual;
 
-            if (horas >= 1 && horas <= 2)
-            { // Se reinicia todo a la 12 de la noche
 
-                no_manana = 1;
-                r_manana = 1;
-                g_manana = 1;
-                b_manana = 1;
+            if(horas == 0 && minutos == 0 && segundos == 0 ){
+                if(ultimapastilla==1){
+                estado_actual = Recarga;
+                }
+                no_manana=1;
 
-                no_tarde = 1;
-                r_tarde = 1;
-                g_tarde = 1;
-                b_tarde = 1;
 
-                no_noche = 1;
-                r_noche = 1;
-                g_noche = 1;
-                b_noche = 1;
+                            no_tarde=1;
 
-                pastilla_m_no = 0;
-                pastilla_t_no = 0;
-                pastilla_n_no = 0;
+
+                            no_noche=1;
+
+
+                            pastilla_m_no=0;
+                            pastilla_t_no=0;
+                            pastilla_n_no=0;
+
+
             }
 
             if (cancel_m == 1 && segundos > 10)
@@ -1036,72 +1036,129 @@ int main(void)
             {
                 estado_actual = AlarmaNoche;
             }
-            if (UARTCharsAvail(UART0_BASE))
+            if(no_noche == 0){
+            if(UARTCharsAvail(UART0_BASE) )
             {
-                c = UARTCharGetNonBlocking(UART0_BASE);
+                reload = UARTCharGetNonBlocking(UART0_BASE);
 
                 // --- NUEVO: detección tecla 'R' ---
-                if (c == 'R' || c == 'r')
-                {
+                if (reload == 'R' || reload == 'r' && no_noche == 0) {
                     UARTprintf("\n--> MODO RECARGA ACTIVADO <--\n");
                     estado_actual = Recarga;
+                    UARTCharPutNonBlocking(UART0_BASE, reload);
+                    flushUART();
+
                 }
+
+            }
             }
             break;
-            // estado de recarga de pastillas //
+                // estado de recarga de pastillas //
         case Recarga:
-            Nueva_pantalla(0x10, 0x10, 0x10);
+            Nueva_pantalla(0x10,0x10,0x10);
 
-            // FONDO
+            //FONDO
             set_color_azul();
-            ComRect(0, 0, HSIZE, VSIZE, true);
+            ComRect(0,0, HSIZE, VSIZE, true);
             set_color_blanco();
-            ComTXT(HSIZE / 2, VSIZE / 2, 26, OPT_CENTER, "Recarga de Pastillas,  Pulse F para finalizar la recarga");
-
+            ComTXT(HSIZE/2,VSIZE/2,20,OPT_CENTER,"Recarga de Pastillas, Pulse F para finalizar la recarga");
+            ComTXT(HSIZE/2,300,20,OPT_CENTER,"Pulse: M , T y N");
             Dibuja();
-            estado_anterior = estado_actual;
+            //estado_anterior=estado_actual;
 
-            posicion = Max_pos;
-            PWMPulseWidthSet(PWM0_BASE, PWM_OUT_1, posicion);
-            PWMPulseWidthSet(PWM0_BASE, PWM_OUT_2, posicion);
-            PWMPulseWidthSet(PWM0_BASE, PWM_OUT_3, posicion);
-            if (UARTCharsAvail(UART0_BASE))
+            posicion=Max_pos;
+           // PWMPulseWidthSet(PWM0_BASE, PWM_OUT_1, posicion);
+//            PWMPulseWidthSet(PWM0_BASE, PWM_OUT_2, posicion);
+//            PWMPulseWidthSet(PWM0_BASE, PWM_OUT_3, posicion);
+            if(UARTCharsAvail(UART0_BASE))
             {
-                c = UARTCharGetNonBlocking(UART0_BASE);
-
-                // --- NUEVO: detección tecla 'R' ---
-                if (c == 'F' || c == 'f')
-                {
-                    UARTprintf("\n--> MODO RECARGA FINALIZADO <--\n");
-                    posicion = Min_pos;
+                reload = UARTCharGetNonBlocking(UART0_BASE);
+                if (reload == 'M' || reload == 'm') {
+                    posicion=Max_pos;
                     PWMPulseWidthSet(PWM0_BASE, PWM_OUT_1, posicion);
+
+                    r_manana=1;
+                    g_manana=1;
+                    b_manana=1;
+
+
+
+                    UARTCharPutNonBlocking(UART0_BASE, reload);
+                    flushUART();
+
+                }
+                if (reload == 'T' || reload == 't') {
+                    posicion=Max_pos;
                     PWMPulseWidthSet(PWM0_BASE, PWM_OUT_2, posicion);
+
+                    r_tarde=1;
+                    g_tarde=1;
+                    b_tarde=1;
+
+                    UARTCharPutNonBlocking(UART0_BASE, reload);
+                    flushUART();
+
+                }
+                if (reload == 'N' || reload == 'n') {
+                    posicion=Max_pos;
                     PWMPulseWidthSet(PWM0_BASE, PWM_OUT_3, posicion);
 
-                    no_manana = 1;
-                    r_manana = 1;
-                    g_manana = 1;
-                    b_manana = 1;
+                    r_noche=1;
+                    g_noche=1;
+                    b_noche=1;
 
-                    no_tarde = 1;
-                    r_tarde = 1;
-                    g_tarde = 1;
-                    b_tarde = 1;
+                    UARTCharPutNonBlocking(UART0_BASE, reload);
+                    flushUART();
 
-                    no_noche = 1;
-                    r_noche = 1;
-                    g_noche = 1;
-                    b_noche = 1;
-
-                    pastilla_m_no = 0;
-                    pastilla_t_no = 0;
-                    pastilla_n_no = 0;
-
-                    estado_actual = Inicio_i;
+                }
+                // --- NUEVO: detección tecla 'R' ---
+                if (reload == 'F' || reload == 'f') {
+                    UARTprintf("\n--> MODO RECARGA FINALIZADO <--\n");
+                    estado_actual=Fin_recarga;
+                    tiempo_inicio = infi;
                 }
             }
-
             break;
+        case Fin_recarga:
+
+
+            Nueva_pantalla(0x10,0x10,0x10);
+
+                       //FONDO
+                       set_color_azul();
+                       ComRect(0,0, HSIZE, VSIZE, true);
+                       set_color_blanco();
+                       ComTXT(HSIZE/2,VSIZE/2,26,OPT_CENTER,"Cerrando Compuertas...");
+                       ultimapastilla=0;
+                       Dibuja();
+
+                       if ((infi - tiempo_inicio) >= 2)
+                       { // han pasado 5 s
+
+                           posicion = Min_pos;
+                           PWMPulseWidthSet(PWM0_BASE, PWM_OUT_1, posicion);
+                       }
+
+                       if ((infi - tiempo_inicio) >= 5)
+                                             { // han pasado 5 s
+
+                                                 posicion = Min_pos;
+                                                 PWMPulseWidthSet(PWM0_BASE, PWM_OUT_2, posicion);
+                                             }
+
+                       if ((infi - tiempo_inicio) >= 7)
+                                             { // han pasado 5 s
+
+                                                 posicion = Min_pos;
+                                                 PWMPulseWidthSet(PWM0_BASE, PWM_OUT_3, posicion);
+                                                 estado_actual = Inicio_i;
+                                             }
+
+
+
+           break;
+
+
 
             //--------------------------------------Usuario quiere poner alarma de mañana-----------------------------------------------//
 
@@ -1713,6 +1770,7 @@ int main(void)
             set_color_blanco();
             ComTXT(HSIZE / 2, VSIZE / 3, 28, OPT_CENTER, "Recoja su pastilla");
             no_noche = 0;
+            ultimapastilla=1;
             r_noche = 0;
             g_noche = 1;
             b_noche = 0;
@@ -1885,6 +1943,7 @@ int main(void)
                 horas_noche = 0;
                 minutos_noche_ant = 0;
                 no_noche = 0;
+                ultimapastilla=1;
                 FinNota();
             }
             if (Boton(10, 200, 70, 30, 22, "Cancelar"))
@@ -1897,6 +1956,7 @@ int main(void)
                 b_noche = 0;
                 FinNota();
                 no_noche = 0;
+                ultimapastilla=1;
                 cancel_n = 1;
                 tiempo_mensaje = infi;
             }
