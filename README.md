@@ -3,7 +3,6 @@ Este documento explica cómo configurar el microcontrolador y la API de WhatsApp
 Siga los pasos cuidadosamente, ya que la configuración no es trivial.
 1. Activación del Bot de WhatsApp
 Agregue el número de teléfono +34 621 33 17 09 en sus contactos con el nombre PastilleroBot.
-Abra WhatsApp, busque el contacto y envíele el mensaje
 2.	En WhatsApp busque el contacto y escríbale ```I allow callmebot to send me messages``` esto activará el bot para que reconozca su número de teléfono.
 3.	 Mandará un mensaje con una apikey a su número de teléfono el cual deberá copiar para poder configurar el programa.
 4.	 Abra Arduino IDE e instale el paquete de board de ESP32 y en librerías instale también UrlEndoce de Masayuki.
